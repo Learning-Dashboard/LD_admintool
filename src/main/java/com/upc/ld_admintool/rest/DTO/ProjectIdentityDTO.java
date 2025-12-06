@@ -1,6 +1,5 @@
 package com.upc.ld_admintool.rest.DTO;
 import com.upc.ld_admintool.domain.utils.DataSource;
-import com.upc.ld_admintool.rest.DTO.ProjectDTO;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

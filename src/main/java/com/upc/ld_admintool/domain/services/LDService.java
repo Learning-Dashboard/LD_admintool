@@ -14,8 +14,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.Resource;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
@@ -157,10 +155,8 @@ public class LDService {
         try {
             ResponseEntity<List> response = restTemplate.getForEntity(url, List.class);
             List<Map<String, Object>> data = response.getBody();
-            System.out.println("Metrics data received: " + data);
             List<MetricDTO> metrics = new ArrayList<>();
             for (Map<String, Object> m : data) {
-                System.out.println("Metric data: " + m);
                 metrics.add(new MetricDTO(
                     String.valueOf(m.get("id")),
                     (String) m.get("externalId"),
@@ -206,7 +202,7 @@ public class LDService {
         if (categoryName != null) formData.add("categoryName", categoryName);
         if (scope != null) formData.add("scope", scope);
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 
         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(formData, headers);
 
@@ -251,7 +247,11 @@ public class LDService {
                 (String) f.get("externalId"),
                 (String) f.get("name"),
                 (String) f.get("description"),
-                (String) f.get("categoryName")
+                (String) f.get("categoryName"),
+                f.get("threshold") != null ? String.valueOf(f.get("threshold")) : null,
+                (String) f.get("type"),
+                (List<String>) f.get("metrics"),
+                (List<String>) f.get("metricsWeights")
             ));
         }
         return factors;
@@ -278,23 +278,22 @@ public class LDService {
     //  -------------------------------
     // Editar factor
     // -------------------------------
-    public void editFactor(Long id, String threshold, String url, String categoryName, String project) {
-        String apiUrl = ldApiUrl + "/qualityFactors/" + id + "?prj=" + URLEncoder.encode(project, StandardCharsets.UTF_8);
+    public void updateFactorCategory(Long id, String category, String project) {
+        String apiUrl = ldApiUrl + "/qualityFactors/" + id +
+                "/category?prj=" + URLEncoder.encode(project, StandardCharsets.UTF_8);
+
         MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
-        if (threshold != null) formData.add("threshold", threshold);
-        if (url != null) formData.add("url", url);
-        if (categoryName != null) formData.add("categoryName", categoryName);
+        formData.add("category", category);
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
-        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(formData, headers);
+        HttpEntity<MultiValueMap<String, String>> request =
+                new HttpEntity<>(formData, headers);
 
-        try {
-            restTemplate.exchange(apiUrl, HttpMethod.PUT, request, Void.class);
-        } catch (HttpClientErrorException e) {
-            System.err.println("Error editing factor: " + e.getMessage());
-        }
+        restTemplate.exchange(apiUrl, HttpMethod.PUT, request, Void.class);
     }
+
 
     // -------------------------------
     // Importar categories de factors 

@@ -23,7 +23,7 @@ public class FactorsService {
         return ldService.getAllFactorsCategories();
     }
 
-    public void editFactor(Long id, String threshold, String url, String categoryName, String project) {
-        ldService.editFactor(id, threshold, url, categoryName, project);
+    public void updateFactorCategory(Long id, String category, String project) {
+        ldService.updateFactorCategory(id, category, project);
     }
 }

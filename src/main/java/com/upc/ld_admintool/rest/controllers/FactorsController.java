@@ -34,13 +34,12 @@ public class FactorsController {
         return ResponseEntity.ok(factorsService.getAllFactorsCategories());
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<Void> editFactor(@PathVariable Long id,
-                        @RequestParam(required = false) String threshold,
-                        @RequestParam(required = false) String url,
-                        @RequestParam(required = false) String categoryName,
-                        @RequestParam("prj") String project) {
-        factorsService.editFactor(id, threshold, url, categoryName, project);
+    @PutMapping("/{id}/category")
+    public ResponseEntity<Void> updateFactorCategory(
+            @PathVariable Long id,
+            @RequestParam("category") String category,
+            @RequestParam("prj") String project) {
+        factorsService.updateFactorCategory(id, category, project);
         return ResponseEntity.ok().build();
     }
 }
