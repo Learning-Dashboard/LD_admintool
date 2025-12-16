@@ -133,6 +133,19 @@ public class LDService {
         }
     }
 
+    // -------------------------------
+    // Eliminar estudiant
+    // -------------------------------
+    public void deleteStudent(Long studentId) {
+        String url = ldApiUrl + "/metrics/students/" + studentId;
+        try {
+            restTemplate.delete(url);
+        } catch (HttpClientErrorException e) {
+            System.err.println("Error deleting student: " + e.getMessage());
+        }
+    }
+
+
 
     // -------------------------------
     // Eliminar projecte
