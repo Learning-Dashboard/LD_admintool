@@ -15,6 +15,8 @@ public class ProjectDTO {
     private String backlogId;
     private Boolean isGlobal;
     private boolean anonymized;
+    
+    private String githubToken;
 
     private Map<DataSource, ProjectIdentityDTO> identities;
     private List<StudentDTO> students;
