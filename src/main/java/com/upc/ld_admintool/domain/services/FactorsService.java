@@ -1,4 +1,5 @@
 package com.upc.ld_admintool.domain.services;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import com.upc.ld_admintool.rest.DTO.FactorDTO;
 import org.springframework.stereotype.Service;
@@ -25,5 +26,9 @@ public class FactorsService {
 
     public void updateFactorCategory(Long id, String category, String project) {
         ldService.updateFactorCategory(id, category, project);
+    }
+
+    public void importQualityFactors() {
+        ldService.importQualityFactors();
     }
 }
