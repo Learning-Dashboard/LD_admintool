@@ -1,6 +1,8 @@
 package com.upc.ld_admintool.rest.controllers;
 import java.util.List;
+import java.util.Map;
 import com.upc.ld_admintool.domain.services.ProjectService;
+import com.upc.ld_admintool.domain.services.validation.ProjectValidationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,7 +21,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 public class ProjectController {
 
     @Autowired
-    private ProjectService projectService; 
+    private ProjectService projectService;
+    
+    @Autowired
+    private ProjectValidationService validationService; 
 
     // Llista tots els projectes
     @GetMapping
@@ -34,11 +39,23 @@ public class ProjectController {
         return ResponseEntity.ok(project);
     }
 
-    // Importa/crea projectes
+    // Valida i importa projectes (només els vàlids)
     @PostMapping
-    public ResponseEntity<?> importProjectsExcel(@RequestBody List<ProjectDTO> projects) {
-        projectService.importProjects(projects);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<Map<String, Object>> importProjectsExcel(@RequestBody List<ProjectDTO> projects) {
+        System.out.println("📥 Rebuts " + projects.size() + " projectes per validar i importar");
+        
+        Map<String, Object> validationResult = validationService.validateProjectsWithDetails(projects);
+        
+        @SuppressWarnings("unchecked")
+        List<ProjectDTO> validProjects = (List<ProjectDTO>) validationResult.get("validProjects");
+        
+        if (!validProjects.isEmpty()) {
+            System.out.println("✅ Important " + validProjects.size() + " projectes vàlids...");
+            projectService.importProjects(validProjects);
+        }
+
+        System.out.println("🔍 Resultat de la validació: " + validationResult);
+        return ResponseEntity.ok(validationResult);
     }
 
     // Modifica un projecte per id

@@ -5,6 +5,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Optional;
+import java.util.Set;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 
 @Service
@@ -24,7 +28,7 @@ public class ProjectService {
             if (complet != null) {
                 result.add(complet);
             } else {
-                result.add(p); // fallback si falla la crida de detall
+                result.add(p); 
             }
         }
         return result;
@@ -47,8 +51,30 @@ public class ProjectService {
     }
 
     public void modificarProjecte(Long id, ProjectDTO projecte) {
+        ProjectDTO original = ldService.getProjectById(id);
+
+        Set<Long> originalIds = Optional.ofNullable(original.getStudents())
+                .orElse(List.of()).stream()
+                .map(StudentDTO::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Set<Long> newIds = Optional.ofNullable(projecte.getStudents())
+                .orElse(List.of()).stream()
+                .map(StudentDTO::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        originalIds.removeAll(newIds);
+
+        for (Long removedId : originalIds) {
+            ldService.deleteStudent(removedId);
+        }
+
+        // 5. Actualitzar projecte (urls, nom, etc.)
         ldService.updateProject(id, projecte);
     }
+
 
     public void esborrarProjecte(Long id) {
         ldService.deleteProject(id);
