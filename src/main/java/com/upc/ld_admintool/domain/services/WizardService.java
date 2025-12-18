@@ -23,13 +23,13 @@ public class WizardService {
         boolean hasFactorsCategories = false;
         boolean hasStrategicIndicatorCategories = false;
 
+        boolean hasAssignments = false;
         try {
             // 1. Projects
             List<ProjectDTO> projects = ldService.getAllProjects();
             hasProjects = !projects.isEmpty();
 
-            // 2. Categories (Parallelized in logic if possible, but for simplicity
-            // sequential here as it's backend-to-backend)
+            // 2. Categories
             List<Map<String, Object>> metricsCats = ldService.getAllMetricsCategories();
             hasMetricsCategories = (metricsCats != null && !metricsCats.isEmpty());
 
@@ -39,7 +39,7 @@ public class WizardService {
             List<Map<String, Object>> siCats = ldService.getAllStrategicIndicatorCategories();
             hasStrategicIndicatorCategories = (siCats != null && !siCats.isEmpty());
 
-            // 3. Data (Check first project)
+            // 3. Data
             if (hasProjects) {
                 String externalId = projects.get(0).getExternalId();
                 if (externalId != null) {

@@ -6,7 +6,6 @@ import lombok.NoArgsConstructor;
 
 @Data
 @AllArgsConstructor
-@NoArgsConstructor
 public class WizardStatusDTO {
     private boolean hasProjects;
     private boolean hasData;
