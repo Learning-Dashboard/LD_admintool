@@ -326,6 +326,15 @@ public class LDService {
     }
 
     // -------------------------------
+    // Obtenir categories d'indicadors estratègics
+    // -------------------------------
+    public List<Map<String, Object>> getAllStrategicIndicatorCategories() {
+        String url = ldApiUrl + "/strategicIndicators/categories";
+        ResponseEntity<List> response = restTemplate.getForEntity(url, List.class);
+        return response.getBody();
+    }
+
+    // -------------------------------
     // Importar categories d'indicadors estratègics
     // -------------------------------
     public void importarCategoriesStrategicIndicators(List<IntervalDTO> dtos) {
