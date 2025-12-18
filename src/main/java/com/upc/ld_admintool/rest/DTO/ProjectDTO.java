@@ -1,4 +1,5 @@
 package com.upc.ld_admintool.rest.DTO;
+
 import com.upc.ld_admintool.domain.utils.DataSource;
 import java.util.List;
 import java.util.Map;
@@ -15,7 +16,8 @@ public class ProjectDTO {
     private String backlogId;
     private Boolean isGlobal;
     private boolean anonymized;
-    
+    private String subject;
+
     private String githubToken;
 
     private Map<DataSource, ProjectIdentityDTO> identities;

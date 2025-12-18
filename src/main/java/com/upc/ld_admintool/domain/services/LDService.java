@@ -17,7 +17,6 @@ import org.springframework.util.MultiValueMap;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
-
 @Service
 public class LDService {
 
@@ -84,7 +83,6 @@ public class LDService {
         }
     }
 
-
     // -------------------------------
     // Actualitzar projecte
     // -------------------------------
@@ -101,7 +99,8 @@ public class LDService {
             updateData.put("description", project.getDescription());
             updateData.put("backlog_id", project.getBacklogId());
             // Atenció: adapta mapping de identities al format correcte
-            // S'ha d'enviar Map<DataSource, String>. Probablement necessites crear un Map a partir de project.getIdentities()
+            // S'ha d'enviar Map<DataSource, String>. Probablement necessites crear un Map a
+            // partir de project.getIdentities()
             Map<DataSource, String> identities = new HashMap<>();
             if (project.getIdentities() != null) {
                 project.getIdentities().forEach((ds, pid) -> {
@@ -145,8 +144,6 @@ public class LDService {
         }
     }
 
-
-
     // -------------------------------
     // Eliminar projecte
     // -------------------------------
@@ -163,7 +160,7 @@ public class LDService {
     // Obtenir mètriques d'un projecte
     // -------------------------------
     public List<MetricDTO> getMetricsByProject(String projectId) {
-        
+
         String url = ldApiUrl + "/metrics?prj=" + projectId;
         try {
             ResponseEntity<List> response = restTemplate.getForEntity(url, List.class);
@@ -171,13 +168,12 @@ public class LDService {
             List<MetricDTO> metrics = new ArrayList<>();
             for (Map<String, Object> m : data) {
                 metrics.add(new MetricDTO(
-                    String.valueOf(m.get("id")),
-                    (String) m.get("externalId"),
-                    (String) m.get("name"),
-                    (String) m.get("description"),
-                    (String) m.get("categoryName"),
-                    (String) m.get("scope")
-                ));
+                        String.valueOf(m.get("id")),
+                        (String) m.get("externalId"),
+                        (String) m.get("name"),
+                        (String) m.get("description"),
+                        (String) m.get("categoryName"),
+                        (String) m.get("scope")));
             }
             return metrics;
         } catch (HttpClientErrorException e) {
@@ -204,16 +200,20 @@ public class LDService {
         return response.getBody();
     }
 
-    //  -------------------------------
+    // -------------------------------
     // Editar mètrica
     // -------------------------------
     public void editMetric(Long id, String threshold, String url, String categoryName, String scope, String project) {
         String apiUrl = ldApiUrl + "/metrics/" + id + "?prj=" + URLEncoder.encode(project, StandardCharsets.UTF_8);
         MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
-        if (threshold != null) formData.add("threshold", threshold);
-        if (url != null) formData.add("url", url);
-        if (categoryName != null) formData.add("categoryName", categoryName);
-        if (scope != null) formData.add("scope", scope);
+        if (threshold != null)
+            formData.add("threshold", threshold);
+        if (url != null)
+            formData.add("url", url);
+        if (categoryName != null)
+            formData.add("categoryName", categoryName);
+        if (scope != null)
+            formData.add("scope", scope);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 
@@ -227,13 +227,13 @@ public class LDService {
     }
 
     // -------------------------------
-    // Importar categories de mètriques 
+    // Importar categories de mètriques
     // -------------------------------
     public void importarCategoriesMetriques(List<CategoryDTO> categories) {
         System.out.println("Importing metric categories: " + categories);
         for (CategoryDTO cat : categories) {
-            String url = ldApiUrl + "/metrics/categories?name=" + cat.getCategory() 
-            + (cat.getPatternGroup() != null ? "&patternGroup=" + cat.getPatternGroup() : "");
+            String url = ldApiUrl + "/metrics/categories?name=" + cat.getCategory()
+                    + (cat.getPatternGroup() != null ? "&patternGroup=" + cat.getPatternGroup() : "");
             try {
                 HttpHeaders headers = new HttpHeaders();
                 headers.setContentType(MediaType.APPLICATION_JSON);
@@ -256,16 +256,15 @@ public class LDService {
         List<FactorDTO> factors = new ArrayList<>();
         for (Map<String, Object> f : data) {
             factors.add(new FactorDTO(
-                String.valueOf(f.get("id")),
-                (String) f.get("externalId"),
-                (String) f.get("name"),
-                (String) f.get("description"),
-                (String) f.get("categoryName"),
-                f.get("threshold") != null ? String.valueOf(f.get("threshold")) : null,
-                (String) f.get("type"),
-                (List<String>) f.get("metrics"),
-                (List<String>) f.get("metricsWeights")
-            ));
+                    String.valueOf(f.get("id")),
+                    (String) f.get("externalId"),
+                    (String) f.get("name"),
+                    (String) f.get("description"),
+                    (String) f.get("categoryName"),
+                    f.get("threshold") != null ? String.valueOf(f.get("threshold")) : null,
+                    (String) f.get("type"),
+                    (List<String>) f.get("metrics"),
+                    (List<String>) f.get("metricsWeights")));
         }
         return factors;
     }
@@ -288,7 +287,7 @@ public class LDService {
         return response.getBody();
     }
 
-    //  -------------------------------
+    // -------------------------------
     // Editar factor
     // -------------------------------
     public void updateFactorCategory(Long id, String category, String project) {
@@ -301,21 +300,19 @@ public class LDService {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
-        HttpEntity<MultiValueMap<String, String>> request =
-                new HttpEntity<>(formData, headers);
+        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(formData, headers);
 
         restTemplate.exchange(apiUrl, HttpMethod.PUT, request, Void.class);
     }
 
-
     // -------------------------------
-    // Importar categories de factors 
+    // Importar categories de factors
     // -------------------------------
     public void importarCategoriesFactors(List<CategoryDTO> categories) {
         System.out.println("Importing factor categories: " + categories);
         for (CategoryDTO cat : categories) {
-            String url = ldApiUrl + "/factors/categories?name=" + cat.getCategory() 
-            + (cat.getPatternGroup() != null ? "&patternGroup=" + cat.getPatternGroup() : "");
+            String url = ldApiUrl + "/factors/categories?name=" + cat.getCategory()
+                    + (cat.getPatternGroup() != null ? "&patternGroup=" + cat.getPatternGroup() : "");
             System.out.println("Importing category to URL: " + url);
             try {
                 HttpHeaders headers = new HttpHeaders();
@@ -329,18 +326,27 @@ public class LDService {
     }
 
     // -------------------------------
-    // Importar categories d'indicadors estratègics 
+    // Obtenir categories d'indicadors estratègics
+    // -------------------------------
+    public List<Map<String, Object>> getAllStrategicIndicatorCategories() {
+        String url = ldApiUrl + "/strategicIndicators/categories";
+        ResponseEntity<List> response = restTemplate.getForEntity(url, List.class);
+        return response.getBody();
+    }
+
+    // -------------------------------
+    // Importar categories d'indicadors estratègics
     // -------------------------------
     public void importarCategoriesStrategicIndicators(List<IntervalDTO> dtos) {
         try {
             List<Map<String, String>> categories = dtos.stream()
-                .map(dto -> {
-                    Map<String, String> map = new HashMap<>();
-                    map.put("name", dto.getName());
-                    map.put("color", dto.getColor());
-                    return map;
-                })
-                .collect(Collectors.toList());
+                    .map(dto -> {
+                        Map<String, String> map = new HashMap<>();
+                        map.put("name", dto.getName());
+                        map.put("color", dto.getColor());
+                        return map;
+                    })
+                    .collect(Collectors.toList());
             System.out.println("Importing strategic indicator categories: " + categories);
             String url = ldApiUrl + "/strategicIndicators/categories";
             restTemplate.postForEntity(url, categories, Void.class);
@@ -348,6 +354,48 @@ public class LDService {
             System.err.println("Error importing strategic indicator categories: " + e.getMessage());
         } catch (Exception e) {
             System.err.println("Unexpected error importing strategic indicator categories: " + e.getMessage());
+        }
+    }
+
+    // -------------------------------
+    // Importar mètriques (cridar LD API /api/metrics/import)
+    // -------------------------------
+    public void importMetrics() {
+        String url = ldApiUrl + "/metrics/import";
+        try {
+            restTemplate.getForEntity(url, Void.class);
+            System.out.println("Metrics imported successfully");
+        } catch (HttpClientErrorException e) {
+            System.err.println("Error importing metrics: " + e.getMessage());
+            throw e;
+        }
+    }
+
+    // -------------------------------
+    // Importar quality factors (cridar LD API /api/qualityFactors/import)
+    // -------------------------------
+    public void importQualityFactors() {
+        String url = ldApiUrl + "/qualityFactors/import";
+        try {
+            restTemplate.getForEntity(url, Void.class);
+            System.out.println("Quality Factors imported successfully");
+        } catch (HttpClientErrorException e) {
+            System.err.println("Error importing quality factors: " + e.getMessage());
+            throw e;
+        }
+    }
+
+    // -------------------------------
+    // Fetch strategic indicators (cridar LD API /api/strategicIndicators/fetch)
+    // -------------------------------
+    public void fetchStrategicIndicators() {
+        String url = ldApiUrl + "/strategicIndicators/fetch";
+        try {
+            restTemplate.getForEntity(url, Void.class);
+            System.out.println("Strategic Indicators fetched successfully");
+        } catch (HttpClientErrorException e) {
+            System.err.println("Error fetching strategic indicators: " + e.getMessage());
+            throw e;
         }
     }
 
