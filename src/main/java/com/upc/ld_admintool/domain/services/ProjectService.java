@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Optional;
 import java.util.Set;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -65,14 +66,32 @@ public class ProjectService {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
-        originalIds.removeAll(newIds);
+        // 1. Identificar estudiants nous (els que tenen ID null són nous)
+        List<StudentDTO> newStudents = Optional.ofNullable(projecte.getStudents())
+                .orElse(List.of()).stream()
+                .filter(student -> student.getId() == null)
+                .collect(Collectors.toList());
 
-        for (Long removedId : originalIds) {
-            ldService.deleteStudent(removedId);
+        // 2. Identificar estudiants a eliminar (estan en original però no en nous)
+        Set<Long> studentsToDelete = new HashSet<>(originalIds);
+        studentsToDelete.removeAll(newIds);
+
+        // 3. Eliminar estudiants
+        if (!studentsToDelete.isEmpty()) {
+            for (Long removedId : studentsToDelete) {
+                ldService.deleteStudent(removedId);
+            }
         }
 
-        // 5. Actualitzar projecte (urls, nom, etc.)
+        // 4. Crear estudiants nous
+        if (!newStudents.isEmpty()) {
+            for (StudentDTO student : newStudents) {
+                System.out.println("  - Creant estudiant: " + student.getName());
+                ldService.createStudent(id, student);
+            }
+        }
         ldService.updateProject(id, projecte);
+        ldEvalService.triggerRefresh();
     }
 
 

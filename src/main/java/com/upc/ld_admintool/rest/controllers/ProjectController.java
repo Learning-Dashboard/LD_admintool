@@ -44,27 +44,19 @@ public class ProjectController {
     // Valida i importa projectes (només els vàlids)
     @PostMapping
     public ResponseEntity<Map<String, Object>> importProjectsExcel(@RequestBody List<ProjectDTO> projects) {
-        System.out.println("📥 Rebuts " + projects.size() + " projectes per validar i importar");
-
         Map<String, Object> validationResult = validationService.validateProjectsWithDetails(projects);
 
         @SuppressWarnings("unchecked")
         List<ProjectDTO> validProjects = (List<ProjectDTO>) validationResult.get("validProjects");
 
         if (!validProjects.isEmpty()) {
-            System.out.println("✅ Important " + validProjects.size() + " projectes vàlids...");
             projectService.importProjects(validProjects);
         }
-
-        System.out.println("🔍 Resultat de la validació: " + validationResult);
         return ResponseEntity.ok(validationResult);
     }
 
-    // Valida un estudiant individualment
     @PostMapping("/validate-student")
     public ResponseEntity<ValidationResult> validateStudent(@RequestBody StudentValidationDTO request) {
-        System.out.println("🔍 Validant estudiant: " + request.getStudent().getName());
-
         ValidationResult result = validationService.validateStudent(
                 request.getGithubUrl(),
                 request.getTaigaUrl(),
@@ -77,6 +69,11 @@ public class ProjectController {
     // Modifica un projecte per id
     @PutMapping("/{id}")
     public ResponseEntity<?> modificarProjecte(@PathVariable Long id, @RequestBody ProjectDTO projecte) {
+        if (projecte.getStudents() != null) {
+            projecte.getStudents().forEach(student -> {
+                System.out.println("  - " + student.getName() + " (ID: " + student.getId() + ")");
+            });
+        }
         projectService.modificarProjecte(id, projecte);
         return ResponseEntity.ok().build();
     }
