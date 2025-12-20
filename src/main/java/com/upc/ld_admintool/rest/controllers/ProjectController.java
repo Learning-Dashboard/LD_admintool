@@ -1,4 +1,5 @@
 package com.upc.ld_admintool.rest.controllers;
+
 import java.util.List;
 import java.util.Map;
 import com.upc.ld_admintool.domain.services.ProjectService;
@@ -9,12 +10,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestBody;
 import com.upc.ld_admintool.rest.DTO.ProjectDTO;
+import com.upc.ld_admintool.rest.DTO.StudentValidationDTO;
+import com.upc.ld_admintool.domain.services.validation.ValidationResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-
 
 @RestController
 @RequestMapping("/api/projects")
@@ -22,9 +24,9 @@ public class ProjectController {
 
     @Autowired
     private ProjectService projectService;
-    
+
     @Autowired
-    private ProjectValidationService validationService; 
+    private ProjectValidationService validationService;
 
     // Llista tots els projectes
     @GetMapping
@@ -42,25 +44,36 @@ public class ProjectController {
     // Valida i importa projectes (només els vàlids)
     @PostMapping
     public ResponseEntity<Map<String, Object>> importProjectsExcel(@RequestBody List<ProjectDTO> projects) {
-        System.out.println("📥 Rebuts " + projects.size() + " projectes per validar i importar");
-        
         Map<String, Object> validationResult = validationService.validateProjectsWithDetails(projects);
-        
+
         @SuppressWarnings("unchecked")
         List<ProjectDTO> validProjects = (List<ProjectDTO>) validationResult.get("validProjects");
-        
+
         if (!validProjects.isEmpty()) {
-            System.out.println("✅ Important " + validProjects.size() + " projectes vàlids...");
             projectService.importProjects(validProjects);
         }
-
-        System.out.println("🔍 Resultat de la validació: " + validationResult);
         return ResponseEntity.ok(validationResult);
+    }
+
+    @PostMapping("/validate-student")
+    public ResponseEntity<ValidationResult> validateStudent(@RequestBody StudentValidationDTO request) {
+        ValidationResult result = validationService.validateStudent(
+                request.getGithubUrl(),
+                request.getTaigaUrl(),
+                request.getGithubToken(),
+                request.getStudent());
+
+        return ResponseEntity.ok(result);
     }
 
     // Modifica un projecte per id
     @PutMapping("/{id}")
     public ResponseEntity<?> modificarProjecte(@PathVariable Long id, @RequestBody ProjectDTO projecte) {
+        if (projecte.getStudents() != null) {
+            projecte.getStudents().forEach(student -> {
+                System.out.println("  - " + student.getName() + " (ID: " + student.getId() + ")");
+            });
+        }
         projectService.modificarProjecte(id, projecte);
         return ResponseEntity.ok().build();
     }

@@ -206,14 +206,10 @@ public class LDService {
     public void editMetric(Long id, String threshold, String url, String categoryName, String scope, String project) {
         String apiUrl = ldApiUrl + "/metrics/" + id + "?prj=" + URLEncoder.encode(project, StandardCharsets.UTF_8);
         MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
-        if (threshold != null)
-            formData.add("threshold", threshold);
-        if (url != null)
-            formData.add("url", url);
-        if (categoryName != null)
-            formData.add("categoryName", categoryName);
-        if (scope != null)
-            formData.add("scope", scope);
+        formData.add("threshold", threshold != null ? threshold : "");
+        formData.add("url", url != null ? url : "");
+        formData.add("categoryName", categoryName != null ? categoryName : "");
+        
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 
@@ -222,7 +218,8 @@ public class LDService {
         try {
             restTemplate.exchange(apiUrl, HttpMethod.PUT, request, Void.class);
         } catch (HttpClientErrorException e) {
-            System.err.println("Error editing metric: " + e.getMessage());
+            System.err.println("   ❌ Error editing metric: " + e.getMessage());
+            throw e;
         }
     }
 

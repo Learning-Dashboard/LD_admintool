@@ -64,14 +64,14 @@ public class ProjectValidationService {
 
                     if (!githubUsernames.isEmpty()) {
                         ValidationResult usersResult = githubValidationService.validateUsersInOrganization(
-                            org, githubUsernames, projectGithubToken
-                        );
+                                org, githubUsernames, projectGithubToken);
                         result.addErrors(usersResult.getErrors());
                         result.addWarnings(usersResult.getWarnings());
                     }
                 }
             } else {
-                result.addError("Format de URL GitHub invàlid per al projecte '" + project.getName() + "': " + githubIdentity.getUrl());
+                result.addError("Format de URL GitHub invàlid per al projecte '" + project.getName() + "': "
+                        + githubIdentity.getUrl());
             }
         } else {
             result.addWarning("El projecte '" + project.getName() + "' no té URL de GitHub definida");
@@ -99,13 +99,15 @@ public class ProjectValidationService {
                     }
 
                     if (!taigaUsernames.isEmpty()) {
-                        ValidationResult usersResult = taigaValidationService.validateUsersInProject(slug, taigaUsernames);
+                        ValidationResult usersResult = taigaValidationService.validateUsersInProject(slug,
+                                taigaUsernames);
                         result.addErrors(usersResult.getErrors());
                         result.addWarnings(usersResult.getWarnings());
                     }
                 }
             } else {
-                result.addError("Format de URL Taiga invàlid per al projecte '" + project.getName() + "': " + taigaIdentity.getUrl());
+                result.addError("Format de URL Taiga invàlid per al projecte '" + project.getName() + "': "
+                        + taigaIdentity.getUrl());
             }
         } else {
             result.addWarning("El projecte '" + project.getName() + "' no té URL de Taiga definida");
@@ -115,8 +117,8 @@ public class ProjectValidationService {
             result.setValid(false);
             System.out.println("❌ Projecte '" + project.getName() + "' té errors: " + result.getErrors());
         } else {
-            System.out.println("✅ Projecte '" + project.getName() + "' és vàlid" + 
-                (projectGithubToken != null && !projectGithubToken.isEmpty() ? " (amb token propi)" : ""));
+            System.out.println("✅ Projecte '" + project.getName() + "' és vàlid" +
+                    (projectGithubToken != null && !projectGithubToken.isEmpty() ? " (amb token propi)" : ""));
         }
 
         return result;
@@ -156,6 +158,54 @@ public class ProjectValidationService {
     }
 
     /**
+     * Valida un estudiant individualment.
+     */
+    public ValidationResult validateStudent(String githubUrl, String taigaUrl, String githubToken, StudentDTO student) {
+        ValidationResult result = new ValidationResult(true);
+
+        if (student == null || student.getIdentities() == null) {
+            result.addError("L'estudiant no té identitats definides");
+            result.setValid(false);
+            return result;
+        }
+
+        // Validar GitHub
+        if (githubUrl != null) {
+            String org = extractGitHubOrg(githubUrl);
+            if (org != null) {
+                StudentIdentityDTO studentGithub = student.getIdentities().get(DataSource.GITHUB);
+                if (studentGithub != null && studentGithub.getUsername() != null) {
+                    List<String> usernames = List.of(studentGithub.getUsername());
+                    ValidationResult usersResult = githubValidationService.validateUsersInOrganization(
+                            org, usernames, githubToken);
+                    result.addErrors(usersResult.getErrors());
+                    result.addWarnings(usersResult.getWarnings());
+                }
+            }
+        }
+
+        // Validar Taiga
+        if (taigaUrl != null) {
+            String slug = extractTaigaSlug(taigaUrl);
+            if (slug != null) {
+                StudentIdentityDTO studentTaiga = student.getIdentities().get(DataSource.TAIGA);
+                if (studentTaiga != null && studentTaiga.getUsername() != null) {
+                    List<String> usernames = List.of(studentTaiga.getUsername());
+                    ValidationResult usersResult = taigaValidationService.validateUsersInProject(slug, usernames);
+                    result.addErrors(usersResult.getErrors());
+                    result.addWarnings(usersResult.getWarnings());
+                }
+            }
+        }
+
+        if (result.hasErrors()) {
+            result.setValid(false);
+        }
+
+        return result;
+    }
+
+    /**
      * Extreu el nom de l'organització d'una URL de GitHub
      * Format: https://github.com/organization (com ho feia la Nora)
      */
@@ -163,10 +213,10 @@ public class ProjectValidationService {
         try {
             // Eliminar .git i barres finals
             url = url.replace(".git", "").replaceAll("/$", "");
-            
+
             // Dividir per /
             String[] parts = url.split("/");
-            
+
             // Buscar "github.com" i agafar el següent element (l'organització)
             for (int i = 0; i < parts.length; i++) {
                 if (parts[i].contains("github.com") && i + 1 < parts.length) {
