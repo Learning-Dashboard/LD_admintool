@@ -74,8 +74,13 @@ public class ProjectController {
                 System.out.println("  - " + student.getName() + " (ID: " + student.getId() + ")");
             });
         }
-        projectService.modificarProjecte(id, projecte);
-        return ResponseEntity.ok().build();
+        try {
+            projectService.modificarProjecte(id, projecte);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     // Elimina un projecte per id
