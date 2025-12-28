@@ -1,6 +1,7 @@
 package com.upc.ld_admintool.domain.services.validation;
 
 import com.upc.ld_admintool.domain.utils.DataSource;
+import com.upc.ld_admintool.domain.services.LDService;
 import com.upc.ld_admintool.rest.DTO.ProjectDTO;
 import com.upc.ld_admintool.rest.DTO.ProjectIdentityDTO;
 import com.upc.ld_admintool.rest.DTO.StudentDTO;
@@ -10,8 +11,12 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class ProjectValidationService {
@@ -21,6 +26,9 @@ public class ProjectValidationService {
 
     @Autowired
     private TaigaValidationService taigaValidationService;
+
+    @Autowired
+    private LDService ldService;
 
     /**
      * Valida un projecte complet amb els seus estudiants.
@@ -33,7 +41,7 @@ public class ProjectValidationService {
 
         // Validar identitats del projecte
         if (project.getIdentities() == null || project.getIdentities().isEmpty()) {
-            result.addError("El projecte '" + project.getName() + "' no té identitats (GitHub/Taiga) definides");
+            result.addError("The project '" + project.getName() + "' does not have defined identities (GitHub/Taiga)");
             return result;
         }
 
@@ -70,11 +78,11 @@ public class ProjectValidationService {
                     }
                 }
             } else {
-                result.addError("Format de URL GitHub invàlid per al projecte '" + project.getName() + "': "
+                result.addError("Invalid GitHub URL format for project '" + project.getName() + "': "
                         + githubIdentity.getUrl());
             }
         } else {
-            result.addWarning("El projecte '" + project.getName() + "' no té URL de GitHub definida");
+            result.addWarning("The project '" + project.getName() + "' does not have a defined GitHub URL");
         }
 
         // Validar Taiga
@@ -106,19 +114,19 @@ public class ProjectValidationService {
                     }
                 }
             } else {
-                result.addError("Format de URL Taiga invàlid per al projecte '" + project.getName() + "': "
+                result.addError("Invalid Taiga URL format for project '" + project.getName() + "': "
                         + taigaIdentity.getUrl());
             }
         } else {
-            result.addWarning("El projecte '" + project.getName() + "' no té URL de Taiga definida");
+            result.addWarning("The project '" + project.getName() + "' does not have a defined Taiga URL");
         }
 
         if (result.hasErrors()) {
             result.setValid(false);
-            System.out.println("❌ Projecte '" + project.getName() + "' té errors: " + result.getErrors());
+            System.out.println("❌ Project '" + project.getName() + "' has errors: " + result.getErrors());
         } else {
-            System.out.println("✅ Projecte '" + project.getName() + "' és vàlid" +
-                    (projectGithubToken != null && !projectGithubToken.isEmpty() ? " (amb token propi)" : ""));
+            System.out.println("✅ Project '" + project.getName() + "' is valid" +
+                    (projectGithubToken != null && !projectGithubToken.isEmpty() ? " (with personal token)" : ""));
         }
 
         return result;
@@ -131,9 +139,32 @@ public class ProjectValidationService {
         Map<String, Object> response = new HashMap<>();
         List<ProjectDTO> validProjects = new ArrayList<>();
         List<Map<String, Object>> invalidProjects = new ArrayList<>();
+        Set<String> existingProjectKeys = loadExistingProjectKeys();
+        Set<String> seenProjectKeys = new HashSet<>();
 
         for (ProjectDTO project : projects) {
-            ValidationResult projectResult = validateProject(project);
+            String projectKey = buildProjectKey(project);
+            boolean alreadyExists = projectKey != null && existingProjectKeys.contains(projectKey);
+            boolean duplicatedInFile = projectKey != null && seenProjectKeys.contains(projectKey);
+            if (projectKey != null) {
+                seenProjectKeys.add(projectKey);
+            }
+
+            ValidationResult projectResult;
+            if (alreadyExists || duplicatedInFile) {
+                projectResult = new ValidationResult(false);
+                if (alreadyExists) {
+                    projectResult.addError("The project '" + project.getName() + "' already exists in the database.");
+                }
+                if (duplicatedInFile) {
+                    projectResult.addError("The project '" + project.getName() + "' is duplicated within the import file.");
+                }
+            } else {
+                projectResult = validateProject(project);
+                if (projectResult.isValid() && projectKey != null) {
+                    existingProjectKeys.add(projectKey);
+                }
+            }
 
             if (projectResult.hasErrors()) {
                 // Projecte invàlid
@@ -157,6 +188,33 @@ public class ProjectValidationService {
         return response;
     }
 
+    private Set<String> loadExistingProjectKeys() {
+        try {
+            return ldService.getAllProjects().stream()
+                    .map(this::buildProjectKey)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+        } catch (Exception e) {
+            System.err.println("⚠ Could not retrieve the list of existing projects: " + e.getMessage());
+            return new HashSet<>();
+        }
+    }
+
+    private String buildProjectKey(ProjectDTO project) {
+        if (project == null) {
+            return null;
+        }
+        String key = normalize(project.getExternalId());
+        if (key == null || key.isEmpty()) {
+            key = normalize(project.getName());
+        }
+        return (key == null || key.isEmpty()) ? null : key;
+    }
+
+    private String normalize(String value) {
+        return value == null ? null : value.trim().toLowerCase();
+    }
+
     /**
      * Valida un estudiant individualment.
      */
@@ -164,7 +222,7 @@ public class ProjectValidationService {
         ValidationResult result = new ValidationResult(true);
 
         if (student == null || student.getIdentities() == null) {
-            result.addError("L'estudiant no té identitats definides");
+            result.addError("The student has no defined identities");
             result.setValid(false);
             return result;
         }
@@ -224,7 +282,7 @@ public class ProjectValidationService {
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error extraient organització de GitHub: " + e.getMessage());
+            System.err.println("Error extracting GitHub organization: " + e.getMessage());
         }
         return null;
     }
@@ -243,7 +301,7 @@ public class ProjectValidationService {
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error extraient slug de Taiga: " + e.getMessage());
+            System.err.println("Error extracting Taiga slug: " + e.getMessage());
         }
         return null;
     }
