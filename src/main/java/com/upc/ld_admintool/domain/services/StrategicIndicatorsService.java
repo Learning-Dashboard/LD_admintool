@@ -11,11 +11,15 @@ public class StrategicIndicatorsService {
     @Autowired
     private LDService ldService;
 
+    @Autowired
+    private ProjectService projectService;
+
     public List<Map<String, Object>> getAllStrategicIndicatorCategories() {
         return ldService.getAllStrategicIndicatorCategories();
     }
 
     public void fetchStrategicIndicators() {
         ldService.fetchStrategicIndicators();
+        projectService.synchronizeCategoriesAfterDataImport();
     }
 }

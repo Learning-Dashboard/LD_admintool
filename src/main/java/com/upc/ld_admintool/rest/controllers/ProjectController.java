@@ -55,6 +55,12 @@ public class ProjectController {
         return ResponseEntity.ok(validationResult);
     }
 
+    @PostMapping("/sync-categories")
+    public ResponseEntity<Void> syncCategoriesAfterImport() {
+        projectService.synchronizeCategoriesAfterDataImport();
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/validate-student")
     public ResponseEntity<ValidationResult> validateStudent(@RequestBody StudentValidationDTO request) {
         ValidationResult result = validationService.validateStudent(
