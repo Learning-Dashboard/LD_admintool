@@ -19,6 +19,9 @@ import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
 
+import com.upc.ld_admintool.domain.services.exceptions.SaveSyncException;
+import com.upc.ld_admintool.rest.DTO.SaveSyncResponseDTO;
+
 @Service
 @Transactional
 public class ProjectService {
@@ -67,8 +70,15 @@ public class ProjectService {
         }
     }
 
-    public void modificarProjecte(Long id, ProjectDTO projecte) {
+    public SaveSyncResponseDTO modificarProjecte(Long id, ProjectDTO projecte) {
+        SaveSyncResponseDTO workflow = new SaveSyncResponseDTO();
+        int stepOrder = 1;
+
         ProjectDTO original = ldService.getProjectById(id);
+        if (original == null) {
+            throw new SaveSyncException("No s'ha trobat el projecte", workflow);
+        }
+        String projectExternalId = original != null ? original.getExternalId() : null;
 
         Set<Long> originalIds = Optional.ofNullable(original.getStudents())
                 .orElse(List.of()).stream()
@@ -82,73 +92,78 @@ public class ProjectService {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
-        // 1. Identificar estudiants nous
         List<StudentDTO> newStudents = Optional.ofNullable(projecte.getStudents())
                 .orElse(List.of()).stream()
                 .filter(student -> student.getId() == null)
                 .collect(Collectors.toList());
 
-        // 2. Identificar estudiants a eliminar
         Set<Long> studentsToDelete = new HashSet<>(originalIds);
         studentsToDelete.removeAll(newIds);
 
-        // Pre-validation: Calculate future size and check categories
-        int currentSize = original.getStudents() != null ? original.getStudents().size() : 0;
-        int futureSize = currentSize - studentsToDelete.size() + newStudents.size();
+        int futureSize = Optional.ofNullable(projecte.getStudents()).map(List::size).orElse(0);
+        workflow.setFinalTeamSize(futureSize);
 
-        if (!newStudents.isEmpty() || !studentsToDelete.isEmpty()) {
+        try {
             validateCategoriesForNewTeamSize(id, futureSize);
+            workflow.addSuccessStep(stepOrder++, "Validate category availability",
+                    "Category definitions available for " + futureSize + " member(s).");
+        } catch (RuntimeException e) {
+            workflow.addFailureStep(stepOrder, "Validate category availability",
+                    "Unable to find categories for " + futureSize + " member(s).", e.getMessage());
+            throw new SaveSyncException("Category validation failed", e, workflow);
         }
 
-        // 3. Eliminar estudiants
-        if (!studentsToDelete.isEmpty()) {
-            for (Long removedId : studentsToDelete) {
-                ldService.deleteStudent(removedId);
-            }
-        }
+        int removed = studentsToDelete.size();
+        int added = newStudents.size();
 
-        // 4. Crear estudiants nous
-        if (!newStudents.isEmpty()) {
-            for (StudentDTO student : newStudents) {
-                System.out.println("  - Creant estudiant: " + student.getName());
-                ldService.createStudent(id, student);
-            }
-        }
-        ldService.updateProject(id, projecte);
-
-        // 5. Si s'han afegit o eliminat estudiants, importar dades i actualitzar
-        // categories
-        if (!newStudents.isEmpty() || !studentsToDelete.isEmpty()) {
-            System.out.println("🔄 Estudiants modificats. Important dades i actualitzant categories...");
-
-            // 1. Refresh LDEval map (sync) so it knows about new students
-            ldEvalService.triggerRefresh();
-
-            // 2. Import Data sequence
-            try {
-                System.out.println("  - Importing Metrics...");
-                ldService.importMetrics();
-
-                // Wait to ensure LD processes the metrics before factors need them
-                try {
-                    Thread.sleep(2000);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+        try {
+            if (!studentsToDelete.isEmpty()) {
+                for (Long removedId : studentsToDelete) {
+                    ldService.deleteStudent(removedId);
                 }
-
-                System.out.println("  - Importing Quality Factors...");
-                ldService.importQualityFactors();
-
-                System.out.println("  - Fetching Strategic Indicators...");
-                ldService.fetchStrategicIndicators();
-            } catch (Exception e) {
-                System.err.println("⚠ Error durant la importació de dades automàtica: " + e.getMessage());
             }
 
-            updateCategoriesForProject(id);
+            if (!newStudents.isEmpty()) {
+                for (StudentDTO student : newStudents) {
+                    System.out.println("  - Creant estudiant: " + student.getName());
+                    ldService.createStudent(id, student);
+                }
+            }
+
+            ldService.updateProject(id, projecte);
+
+            String detail = String.format("Team now has %d member(s). Added: %d, removed: %d.",
+                    futureSize, added, removed);
+            workflow.addSuccessStep(stepOrder++, "Update LD team roster", detail);
+        } catch (RuntimeException e) {
+            workflow.addFailureStep(stepOrder, "Update LD team roster",
+                    "Error updating roster in LD.", e.getMessage());
+            throw new SaveSyncException("Roster update failed", e, workflow);
+        }
+
+        boolean refreshOk = ldEvalService.triggerRefresh();
+        if (!refreshOk) {
+            workflow.addFailureStep(stepOrder, "Refresh LDEval caches",
+                    "LDEval refresh endpoint returned an error.", "LDEval refresh failed");
+            throw new SaveSyncException("LDEval refresh failed", workflow);
+        }
+        workflow.addSuccessStep(stepOrder++, "Refresh LDEval caches",
+                "Learning Dashboard has been instructed to refresh its evaluation cache.");
+
+        runDataImportSequenceWithRetry(projectExternalId, newStudents, workflow, stepOrder++);
+
+        try {
+            updateCategoriesForProject(id, projecte, futureSize);
+            workflow.addSuccessStep(stepOrder++, "Reassign metric & factor categories",
+                    "Categories recalculated for " + futureSize + " member(s).");
+        } catch (RuntimeException e) {
+            workflow.addFailureStep(stepOrder, "Reassign metric & factor categories",
+                    "Unable to update categories.", e.getMessage());
+            throw new SaveSyncException("Category update failed", e, workflow);
         }
 
         ldEvalService.triggerRefresh();
+        return workflow;
     }
 
     public void esborrarProjecte(Long id) {
@@ -213,23 +228,40 @@ public class ProjectService {
     }
 
     public void updateCategoriesForProject(Long projectId) {
+        updateCategoriesForProject(projectId, null, null);
+    }
+
+    public void updateCategoriesForProject(Long projectId, ProjectDTO overrideProject, Integer overrideStudentCount) {
         // Removed try-catch to allow exception propagation
-        ProjectDTO project = ldService.getProjectById(projectId);
+        ProjectDTO project = overrideProject != null ? overrideProject : ldService.getProjectById(projectId);
         if (project == null) {
             throw new RuntimeException("No s'ha trobat el projecte amb ID: " + projectId);
         }
 
-        String projectExternalId = project.getExternalId();
-        int numStudents = project.getStudents() != null ? project.getStudents().size() : 0;
+    String projectExternalId = project.getExternalId();
+    int numStudents = overrideStudentCount != null ? overrideStudentCount
+        : (project.getStudents() != null ? project.getStudents().size() : 0);
 
         List<Map<String, Object>> metricCategories = ldService.getAllMetricsCategories();
         List<Map<String, Object>> factorCategories = ldService.getAllFactorsCategories();
 
         // Actualitzar mètriques
         List<MetricDTO> metrics = ldService.getMetricsByProject(projectExternalId);
+        Set<String> projectAliases = overrideProject != null
+                ? buildStudentAliases(overrideProject.getStudents())
+                : buildStudentAliases(project);
+    Map<String, String> aliasCategoryLookup = buildMetricAliasCategoryLookup(metrics, projectAliases);
 
         for (MetricDTO metric : metrics) {
             String currentCategory = metric.getCategoryName();
+            if (needsAliasCategory(currentCategory)) {
+                String desired = resolveCategoryFromAlias(metric, projectAliases, aliasCategoryLookup);
+                if (desired != null && !desired.equalsIgnoreCase(currentCategory)) {
+                    updateMetricCategory(metric, desired, projectExternalId);
+                }
+            }
+
+            currentCategory = metric.getCategoryName();
             if (currentCategory == null || currentCategory.isEmpty()) {
                 continue;
             }
@@ -251,13 +283,7 @@ public class ProjectService {
                 }
 
                 if (!newCategory.equals(currentCategory)) {
-                    ldService.editMetric(
-                            Long.parseLong(metric.getId()),
-                            null, // threshold
-                            null, // url
-                            newCategory, // categoryName
-                            metric.getScope(), // scope
-                            projectExternalId);
+                    updateMetricCategory(metric, newCategory, projectExternalId);
                 }
             }
         }
@@ -288,8 +314,6 @@ public class ProjectService {
                 }
 
                 if (!newCategory.equals(currentCategory)) {
-                    System.out.println("  - Actualitzant factor: " + factor.getExternalId() +
-                            " de '" + currentCategory + "' a '" + newCategory + "'");
                     Long factorId = Long.parseLong(factor.getId());
                     ldService.updateFactorCategory(factorId, newCategory, projectExternalId);
                 }
@@ -313,7 +337,6 @@ public class ProjectService {
 
     public void synchronizeCategoriesAfterDataImport() {
         try {
-            System.out.println("🔄 Sincronitzant categories després de la importació de dades del wizard...");
             List<ProjectDTO> summaries = ldService.getAllProjects();
             Map<String, List<ProjectDTO>> grouped = new HashMap<>();
 
@@ -364,6 +387,102 @@ public class ProjectService {
         } catch (Exception e) {
             System.err.println("⚠ Error sincronitzant categories després d'importar dades: " + e.getMessage());
         }
+    }
+
+    private void runDataImportSequenceWithRetry(String projectExternalId, List<StudentDTO> newStudents,
+            SaveSyncResponseDTO workflow, int stepOrder) {
+        boolean needVerification = projectExternalId != null && newStudents != null && !newStudents.isEmpty();
+        int maxAttempts = needVerification ? 3 : 1;
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                executeDataImportCycle();
+            } catch (RuntimeException e) {
+                workflow.addFailureStep(stepOrder, "Re-import metrics, factors & indicators",
+                        "Error while importing new data.", e.getMessage());
+                throw new SaveSyncException("Data import failed", e, workflow);
+            }
+
+            if (!needVerification || metricsAvailableForStudents(projectExternalId, newStudents)) {
+                String detail = attempt == 1
+                        ? "Metrics, quality factors and strategic indicators re-imported successfully."
+                        : "Data re-import succeeded after retry #" + attempt + ".";
+                workflow.addSuccessStep(stepOrder, "Re-import metrics, factors & indicators", detail);
+                return;
+            }
+
+            if (attempt < maxAttempts) {
+                System.out.println(
+                        "  • Metrics for the new students not ready yet. Waiting 5s before retry #" + (attempt + 1)
+                                + "...");
+                try {
+                    Thread.sleep(5000L);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    workflow.addFailureStep(stepOrder, "Re-import metrics, factors & indicators",
+                            "Interrupted while waiting for metrics.", ie.getMessage());
+                    throw new SaveSyncException("Interrupted while waiting for metrics", ie, workflow);
+                }
+            }
+        }
+
+        workflow.addFailureStep(stepOrder, "Re-import metrics, factors & indicators",
+                "Metrics for the new students were not detected after multiple import attempts.",
+                "New metrics not found after retries.");
+        throw new SaveSyncException("New metrics not detected after import retries", workflow);
+    }
+
+    private void executeDataImportCycle() {
+        System.out.println("  - Importing Metrics...");
+        ldService.importMetrics();
+        try {
+            Thread.sleep(2000L);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted while waiting between metric and factor imports", e);
+        }
+        System.out.println("  - Importing Quality Factors...");
+        ldService.importQualityFactors();
+        System.out.println("  - Fetching Strategic Indicators...");
+        ldService.fetchStrategicIndicators();
+    }
+
+    private boolean metricsAvailableForStudents(String projectExternalId, List<StudentDTO> students) {
+        if (projectExternalId == null || students == null || students.isEmpty()) {
+            return true;
+        }
+        List<MetricDTO> metrics = ldService.getMetricsByProject(projectExternalId);
+        if (metrics == null || metrics.isEmpty()) {
+            return false;
+        }
+        for (StudentDTO student : students) {
+            Set<String> aliases = extractAliasesForStudent(student);
+            if (aliases.isEmpty()) {
+                continue;
+            }
+            boolean found = metrics.stream().anyMatch(metric -> metricMatchesAliases(metric, aliases));
+            if (!found) {
+                System.out.println("  • Metrics for student '" + student.getName() + "' not detected yet.");
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean metricMatchesAliases(MetricDTO metric, Set<String> aliases) {
+        if (metric == null || aliases.isEmpty()) {
+            return false;
+        }
+        String normalizedId = normalizeMetricId(metric.getExternalId());
+        if (normalizedId == null) {
+            return false;
+        }
+        int idx = normalizedId.indexOf('_');
+        if (idx <= 0 || idx >= normalizedId.length() - 1) {
+            return false;
+        }
+        String suffix = normalizedId.substring(idx + 1);
+        return matchesAlias(suffix, aliases);
     }
 
     private void applyMetricCategoriesFromReference(ProjectDTO referenceProject, List<MetricDTO> referenceMetrics,
@@ -490,27 +609,101 @@ public class ProjectService {
         return lookup;
     }
 
+    private Map<String, String> buildMetricAliasCategoryLookup(List<MetricDTO> metrics, Set<String> aliases) {
+        Map<String, String> lookup = new HashMap<>();
+        if (metrics == null || aliases == null || aliases.isEmpty()) {
+            return lookup;
+        }
+        for (MetricDTO metric : metrics) {
+            if (metric == null || needsAliasCategory(metric.getCategoryName())) {
+                continue;
+            }
+            String normalizedId = normalizeMetricId(metric.getExternalId());
+            if (normalizedId == null) {
+                continue;
+            }
+            String baseKey = buildMetricBaseKey(normalizedId, metric.getScope(), aliases);
+            if (baseKey != null && !lookup.containsKey(baseKey)) {
+                lookup.put(baseKey, metric.getCategoryName());
+            }
+        }
+        return lookup;
+    }
+
+    private boolean needsAliasCategory(String category) {
+        return category == null || category.isBlank() || "default".equalsIgnoreCase(category);
+    }
+
+    private String resolveCategoryFromAlias(MetricDTO metric, Set<String> aliases, Map<String, String> aliasLookup) {
+        if (metric == null || aliases == null || aliases.isEmpty() || aliasLookup == null || aliasLookup.isEmpty()) {
+            return null;
+        }
+        String normalizedId = normalizeMetricId(metric.getExternalId());
+        if (normalizedId == null) {
+            return null;
+        }
+        String baseKey = buildMetricBaseKey(normalizedId, metric.getScope(), aliases);
+        if (baseKey == null) {
+            System.out.println("[Categories][Alias] Metric " + metric.getExternalId()
+                    + " -> baseKey not detected (aliases=" + aliases + ")");
+            return null;
+        }
+        String resolved = aliasLookup.get(baseKey);
+        if (resolved == null) {
+            System.out.println("[Categories][Alias] Metric " + metric.getExternalId()
+                    + " -> baseKey='" + baseKey + "' NOT found in lookup");
+        } else {
+            System.out.println("[Categories][Alias] Metric " + metric.getExternalId()
+                    + " -> baseKey='" + baseKey + "' matched '" + resolved + "'");
+        }
+        return resolved;
+    }
+
+    private void updateMetricCategory(MetricDTO metric, String category, String projectExternalId) {
+        if (metric == null || metric.getId() == null || category == null || projectExternalId == null) {
+            return;
+        }
+        metric.setCategoryName(category);
+        ldService.editMetric(
+                Long.parseLong(metric.getId()),
+                null,
+                null,
+                category,
+                metric.getScope(),
+                projectExternalId);
+    }
+
     private Set<String> buildStudentAliases(ProjectDTO project) {
+        if (project == null) {
+            return new HashSet<>();
+        }
+        return buildStudentAliases(project.getStudents());
+    }
+
+    private Set<String> buildStudentAliases(List<StudentDTO> students) {
         Set<String> aliases = new HashSet<>();
-        if (project == null || project.getStudents() == null) {
+        if (students == null) {
             return aliases;
         }
+        students.forEach(student -> aliases.addAll(extractAliasesForStudent(student)));
+        return aliases;
+    }
 
-        project.getStudents().forEach(student -> {
-            if (student == null) {
-                return;
-            }
-            if (student.getName() != null) {
-                addAliasVariants(aliases, slugify(student.getName()));
-            }
-            if (student.getIdentities() != null) {
-                student.getIdentities().values().forEach(identity -> {
-                    if (identity != null && identity.getUsername() != null) {
-                        addAliasVariants(aliases, slugify(identity.getUsername()));
-                    }
-                });
-            }
-        });
+    private Set<String> extractAliasesForStudent(StudentDTO student) {
+        Set<String> aliases = new HashSet<>();
+        if (student == null) {
+            return aliases;
+        }
+        if (student.getName() != null) {
+            addAliasVariants(aliases, slugify(student.getName()));
+        }
+        if (student.getIdentities() != null) {
+            student.getIdentities().values().forEach(identity -> {
+                if (identity != null && identity.getUsername() != null) {
+                    addAliasVariants(aliases, slugify(identity.getUsername()));
+                }
+            });
+        }
         return aliases;
     }
 

@@ -3,6 +3,7 @@ package com.upc.ld_admintool.rest.controllers;
 import java.util.List;
 import java.util.Map;
 import com.upc.ld_admintool.domain.services.ProjectService;
+import com.upc.ld_admintool.domain.services.exceptions.SaveSyncException;
 import com.upc.ld_admintool.domain.services.validation.ProjectValidationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestBody;
 import com.upc.ld_admintool.rest.DTO.ProjectDTO;
+import com.upc.ld_admintool.rest.DTO.SaveSyncResponseDTO;
 import com.upc.ld_admintool.rest.DTO.StudentValidationDTO;
 import com.upc.ld_admintool.domain.services.validation.ValidationResult;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -81,8 +83,10 @@ public class ProjectController {
             });
         }
         try {
-            projectService.modificarProjecte(id, projecte);
-            return ResponseEntity.ok().build();
+            SaveSyncResponseDTO response = projectService.modificarProjecte(id, projecte);
+            return ResponseEntity.ok(response);
+        } catch (SaveSyncException syncError) {
+            return ResponseEntity.badRequest().body(syncError.getResponse());
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body(e.getMessage());
