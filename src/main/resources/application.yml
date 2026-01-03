@@ -1,6 +1,12 @@
 server:
   port: 8080
 
+ld:
+  api:
+    url: https://eaa864cb69ae.ngrok-free.app/api
+  eval:
+    url: http://localhost:5001
+
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5433/postgres
