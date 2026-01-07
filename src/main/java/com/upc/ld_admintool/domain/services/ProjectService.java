@@ -125,7 +125,6 @@ public class ProjectService {
 
             if (!newStudents.isEmpty()) {
                 for (StudentDTO student : newStudents) {
-                    System.out.println("  - Creant estudiant: " + student.getName());
                     ldService.createStudent(id, student);
                 }
             }
@@ -412,9 +411,6 @@ public class ProjectService {
             }
 
             if (attempt < maxAttempts) {
-                System.out.println(
-                        "  • Metrics for the new students not ready yet. Waiting 5s before retry #" + (attempt + 1)
-                                + "...");
                 try {
                     Thread.sleep(5000L);
                 } catch (InterruptedException ie) {
@@ -433,7 +429,6 @@ public class ProjectService {
     }
 
     private void executeDataImportCycle() {
-        System.out.println("  - Importing Metrics...");
         ldService.importMetrics();
         try {
             Thread.sleep(2000L);
@@ -441,9 +436,7 @@ public class ProjectService {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Interrupted while waiting between metric and factor imports", e);
         }
-        System.out.println("  - Importing Quality Factors...");
         ldService.importQualityFactors();
-        System.out.println("  - Fetching Strategic Indicators...");
         ldService.fetchStrategicIndicators();
     }
 
@@ -462,7 +455,6 @@ public class ProjectService {
             }
             boolean found = metrics.stream().anyMatch(metric -> metricMatchesAliases(metric, aliases));
             if (!found) {
-                System.out.println("  • Metrics for student '" + student.getName() + "' not detected yet.");
                 return false;
             }
         }
@@ -494,12 +486,6 @@ public class ProjectService {
         MetricCategoryLookup lookup = buildMetricCategoryLookup(referenceProject, referenceMetrics);
         Set<String> newAliases = buildStudentAliases(newProject);
 
-        System.out.println("ℹ Sincronitzant categories de mètriques: referencia="
-                + (referenceProject != null ? referenceProject.getExternalId() : "?")
-                + " (" + referenceMetrics.size() + " mètriques) -> nou="
-                + (newProject != null ? newProject.getExternalId() : "?")
-                + " (" + newMetrics.size() + " mètriques). Aliases=" + newAliases);
-
         int updated = 0;
         int matched = 0;
         int aliasMatches = 0;
@@ -521,8 +507,6 @@ public class ProjectService {
                     desiredCategory = lookup.byBase.get(baseKey);
                     if (desiredCategory != null) {
                         aliasMatches++;
-                        System.out.println("  • Alias match metric='" + metric.getExternalId()
-                                + "' baseKey='" + baseKey + "' -> categoria='" + desiredCategory + "'");
                     }
                 }
             } else {
@@ -536,22 +520,14 @@ public class ProjectService {
                     updated++;
                     ldService.editMetric(Long.parseLong(metric.getId()), null, null,
                             desiredCategory, metric.getScope(), newProject.getExternalId());
-                    System.out.println("  ✓ Actualitzant mètrica '" + metric.getExternalId() + "' a categoria '"
-                            + desiredCategory + "'");
                 } catch (Exception e) {
                     System.err.println("⚠ Error actualitzant la mètrica " + metric.getExternalId() + ": "
                             + e.getMessage());
                 }
             } else if (desiredCategory == null) {
                 noMatch++;
-                System.out.println("  • Sense match per mètrica '" + metric.getExternalId()
-                        + "' (normalitzat='" + normalizedId + "'). Categoria actual='"
-                        + metric.getCategoryName() + "'");
             }
         }
-
-        System.out.println("ℹ Resum mètriques: exactes=" + matched + ", alias=" + aliasMatches
-                + ", actualitzades=" + updated + ", senseMatch=" + noMatch);
     }
 
     private void applyFactorCategoriesFromReference(List<FactorDTO> referenceFactors,
@@ -644,18 +620,9 @@ public class ProjectService {
         }
         String baseKey = buildMetricBaseKey(normalizedId, metric.getScope(), aliases);
         if (baseKey == null) {
-            System.out.println("[Categories][Alias] Metric " + metric.getExternalId()
-                    + " -> baseKey not detected (aliases=" + aliases + ")");
             return null;
         }
         String resolved = aliasLookup.get(baseKey);
-        if (resolved == null) {
-            System.out.println("[Categories][Alias] Metric " + metric.getExternalId()
-                    + " -> baseKey='" + baseKey + "' NOT found in lookup");
-        } else {
-            System.out.println("[Categories][Alias] Metric " + metric.getExternalId()
-                    + " -> baseKey='" + baseKey + "' matched '" + resolved + "'");
-        }
         return resolved;
     }
 
