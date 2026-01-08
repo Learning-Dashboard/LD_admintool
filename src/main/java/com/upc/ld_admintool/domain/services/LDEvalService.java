@@ -18,7 +18,7 @@ public class LDEvalService {
     // Trigger refresh del LDEval
     // -------------------------------
     public boolean triggerRefresh() {
-        String url = ldEvalUrl + "/refresh";
+        String url = ldEvalUrl + "/api/refresh";
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 

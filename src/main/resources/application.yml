@@ -1,15 +1,23 @@
 server:
-  port: 8080
+  port: ${ADMINTOOL_PORT:8080}
 
 ld:
   api:
-    url: https://eaa864cb69ae.ngrok-free.app/api
+    url: ${ADMINTOOL_LD_API_URL:https://eaa864cb69ae.ngrok-free.app/api}
   eval:
-    url: http://localhost:5001
+    url: ${ADMINTOOL_EVAL_URL:http://localhost:5001}
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5433/postgres
-    username: postgres
-    password: example
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:postgres}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:example}
     driver-class-name: org.postgresql.Driver
+
+taiga:
+  api:
+    url: ${TAIGA_API_URL:https://api.taiga.io/api/v1}
+  token: ${TAIGA_TOKEN:}
+
+github:
+  token: ${GITHUB_TOKEN:}
