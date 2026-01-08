@@ -37,8 +37,6 @@ public class ProjectValidationService {
     public ValidationResult validateProject(ProjectDTO project) {
         ValidationResult result = new ValidationResult(true);
 
-        System.out.println("🔍 Validant projecte: " + project.getName());
-
         // Validar identitats del projecte
         if (project.getIdentities() == null || project.getIdentities().isEmpty()) {
             result.addError("The project '" + project.getName() + "' does not have defined identities (GitHub/Taiga)");
@@ -123,12 +121,7 @@ public class ProjectValidationService {
 
         if (result.hasErrors()) {
             result.setValid(false);
-            System.out.println("❌ Project '" + project.getName() + "' has errors: " + result.getErrors());
-        } else {
-            System.out.println("✅ Project '" + project.getName() + "' is valid" +
-                    (projectGithubToken != null && !projectGithubToken.isEmpty() ? " (with personal token)" : ""));
         }
-
         return result;
     }
 

@@ -39,26 +39,18 @@ public class GitHubValidationService {
             String url = githubApiUrl + "/orgs/" + org + "/members";
             HttpHeaders headers = createHeaders(projectToken);
             HttpEntity<String> entity = new HttpEntity<>(headers);
-
-            System.out.println("🔍 Validant organització GitHub: " + org +
-                    (projectToken != null && !projectToken.isEmpty() ? " (amb token del projecte)" : ""));
-
             ResponseEntity<Object[]> response = restTemplate.exchange(url, HttpMethod.GET, entity, Object[].class);
 
             if (response.getStatusCode() == HttpStatus.OK) {
                 Object[] members = response.getBody();
                 if (members == null || members.length == 0) {
                     // Organització existeix però membres són privats
-                    result.addWarning("L'organització '" + org + "' té membres privats (no es poden validar usuaris)");
-                    System.out.println("⚠️ Organització '" + org + "' amb membres privats");
-                } else {
-                    System.out.println("✅ Organització '" + org + "' validada amb " + members.length + " membres");
+                    result.addWarning("L'organització '" + org + "' té membres privats (no es poden validar usuaris)");  
                 }
             }
 
         } catch (HttpClientErrorException.NotFound e) {
             result.addError("L'organització GitHub '" + org + "' no existeix");
-            System.out.println("❌ Organització '" + org + "' no trobada (404)");
         } catch (HttpClientErrorException.Unauthorized e) {
             result.addError("No tens autorització per accedir a l'organització '" + org + "' (comprova el token)");
         } catch (Exception e) {
@@ -95,7 +87,6 @@ public class GitHubValidationService {
                 // No podem validar perquè membres són privats - això és un ERROR
                 result.addError("No es poden validar els usuaris perquè els membres de l'organització '" + org
                         + "' són privats. Proporciona un token amb permisos adequats.");
-                System.out.println("❌ No es poden validar usuaris de '" + org + "' (membres privats)");
                 return result;
             }
 
@@ -121,9 +112,6 @@ public class GitHubValidationService {
 
                 if (!found) {
                     result.addError("L'usuari GitHub '" + username + "' no és membre de l'organització '" + org + "'");
-                    System.out.println("❌ Usuari '" + username + "' no és membre de '" + org + "'");
-                } else {
-                    System.out.println("✅ Usuari '" + username + "' és membre de '" + org + "'");
                 }
             }
 
@@ -180,12 +168,8 @@ public class GitHubValidationService {
         String tokenToUse = null;
         if (projectToken != null && !projectToken.trim().isEmpty()) {
             tokenToUse = projectToken.trim();
-            System.out.println("🔑 Utilitzant token del projecte");
         } else if (githubToken != null && !githubToken.isEmpty()) {
             tokenToUse = githubToken;
-            System.out.println("🔑 Utilitzant token global");
-        } else {
-            System.out.println("⚠️ Sense token (API pública - rate limit 60 req/h)");
         }
 
         if (tokenToUse != null) {
