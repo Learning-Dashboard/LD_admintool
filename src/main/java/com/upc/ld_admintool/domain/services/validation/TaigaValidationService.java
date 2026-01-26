@@ -38,18 +38,34 @@ public class TaigaValidationService {
 
         try {
             String url = taigaApiUrl + "/projects/by_slug?slug=" + projectSlug;
+            System.out.println("🔍 Validating Taiga project: " + url);
+
             HttpHeaders headers = createHeaders();
             HttpEntity<String> entity = new HttpEntity<>(headers);
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
 
+            // Check if the response is successful
+            if (response.getStatusCode().is2xxSuccessful()) {
+                System.out.println("✅ Taiga project '" + projectSlug + "' exists and is accessible");
+            } else {
+                result.addError(
+                        "El projecte Taiga '" + projectSlug + "' retorna codi d'estat: " + response.getStatusCode());
+            }
+
         } catch (HttpClientErrorException.NotFound e) {
+            System.err.println("❌ Taiga project '" + projectSlug + "' not found (404)");
             result.addError("El projecte Taiga '" + projectSlug + "' no existeix");
         } catch (HttpClientErrorException.Unauthorized e) {
+            System.err.println("❌ Taiga project '" + projectSlug + "' unauthorized (401)");
             result.addError("No tens autorització per accedir al projecte Taiga '" + projectSlug
                     + "' (comprova el token de Taiga)");
         } catch (HttpClientErrorException.Forbidden e) {
+            System.err.println("⚠️ Taiga project '" + projectSlug + "' forbidden (403)");
             result.addWarning("El projecte Taiga '" + projectSlug + "' és privat o no tens permisos");
         } catch (Exception e) {
+            System.err.println("❌ Error validating Taiga project '" + projectSlug + "': " + e.getClass().getName()
+                    + " - " + e.getMessage());
+            e.printStackTrace();
             result.addError("Error validant el projecte Taiga '" + projectSlug + "': " + e.getMessage());
         }
 
@@ -68,6 +84,8 @@ public class TaigaValidationService {
 
         try {
             String url = taigaApiUrl + "/projects/by_slug?slug=" + projectSlug;
+            System.out.println("🔍 Validating users in Taiga project: " + url);
+
             HttpHeaders headers = createHeaders();
             HttpEntity<String> entity = new HttpEntity<>(headers);
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
@@ -87,6 +105,9 @@ public class TaigaValidationService {
                         }
                     }
 
+                    System.out.println("📋 Project members: " + projectMembers);
+                    System.out.println("🔍 Validating usernames: " + usernames);
+
                     // Validar cada username
                     for (String username : usernames) {
                         if (username == null || username.trim().isEmpty()) {
@@ -98,27 +119,38 @@ public class TaigaValidationService {
                             System.out.println(
                                     "✅ Usuari '" + username + "' és membre del projecte Taiga '" + projectSlug + "'");
                         } else {
+                            System.err.println("❌ Usuari '" + username + "' NO és membre del projecte Taiga '"
+                                    + projectSlug + "'");
                             result.addError("L'usuari '" + username + "' NO és membre del projecte Taiga '"
                                     + projectSlug + "'");
                         }
                     }
                 } else {
+                    System.err.println("⚠️ No members node found in Taiga project '" + projectSlug + "'");
                     result.addWarning("No es poden validar els membres del projecte Taiga '" + projectSlug
                             + "' (membres no disponibles)");
                 }
             } else {
+                System.err
+                        .println("❌ Failed to access Taiga project '" + projectSlug + "': " + response.getStatusCode());
                 result.addError("No es pot accedir al projecte Taiga '" + projectSlug + "' per validar usuaris");
             }
 
         } catch (HttpClientErrorException.NotFound e) {
+            System.err.println("❌ Taiga project '" + projectSlug + "' not found (404) during user validation");
             result.addError("El projecte Taiga '" + projectSlug + "' no existeix");
         } catch (HttpClientErrorException.Unauthorized e) {
+            System.err.println("❌ Taiga project '" + projectSlug + "' unauthorized (401) during user validation");
             result.addError("No tens autorització per accedir al projecte Taiga '" + projectSlug
                     + "' (comprova el token de Taiga)");
         } catch (HttpClientErrorException.Forbidden e) {
+            System.err.println("⚠️ Taiga project '" + projectSlug + "' forbidden (403) during user validation");
             result.addWarning(
                     "El projecte Taiga '" + projectSlug + "' és privat o no tens permisos per veure els membres");
         } catch (Exception e) {
+            System.err.println("❌ Error validating users in Taiga project '" + projectSlug + "': "
+                    + e.getClass().getName() + " - " + e.getMessage());
+            e.printStackTrace();
             result.addError("Error validant usuaris al projecte Taiga '" + projectSlug + "': " + e.getMessage());
         }
 

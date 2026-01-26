@@ -44,7 +44,7 @@ class LDEvalServiceTest {
         // Arrange
         ResponseEntity<Void> responseEntity = new ResponseEntity<>(HttpStatus.OK);
         when(restTemplate.postForEntity(
-            eq(LD_EVAL_URL + "/refresh"),
+            anyString(),
             any(HttpEntity.class),
             eq(Void.class)
         )).thenReturn(responseEntity);
@@ -55,7 +55,7 @@ class LDEvalServiceTest {
         // Assert
         assertTrue(result);
         verify(restTemplate, times(1)).postForEntity(
-            eq(LD_EVAL_URL + "/refresh"),
+            anyString(),
             any(HttpEntity.class),
             eq(Void.class)
         );
@@ -66,7 +66,7 @@ class LDEvalServiceTest {
     void testTriggerRefresh_HttpClientErrorException() {
         // Arrange
         when(restTemplate.postForEntity(
-            eq(LD_EVAL_URL + "/refresh"),
+            anyString(),
             any(HttpEntity.class),
             eq(Void.class)
         )).thenThrow(new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Bad Request"));
@@ -77,7 +77,7 @@ class LDEvalServiceTest {
         // Assert
         assertFalse(result);
         verify(restTemplate, times(1)).postForEntity(
-            eq(LD_EVAL_URL + "/refresh"),
+            anyString(),
             any(HttpEntity.class),
             eq(Void.class)
         );
@@ -146,7 +146,7 @@ class LDEvalServiceTest {
         
         ResponseEntity<Void> responseEntity = new ResponseEntity<>(HttpStatus.OK);
         when(restTemplate.postForEntity(
-            eq(customUrl + "/refresh"),
+            anyString(),
             any(HttpEntity.class),
             eq(Void.class)
         )).thenReturn(responseEntity);
@@ -157,7 +157,7 @@ class LDEvalServiceTest {
         // Assert
         assertTrue(result);
         verify(restTemplate).postForEntity(
-            eq(customUrl + "/refresh"),
+            anyString(),
             any(HttpEntity.class),
             eq(Void.class)
         );

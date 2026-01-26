@@ -150,7 +150,8 @@ public class ProjectValidationService {
                     projectResult.addError("The project '" + project.getName() + "' already exists in the database.");
                 }
                 if (duplicatedInFile) {
-                    projectResult.addError("The project '" + project.getName() + "' is duplicated within the import file.");
+                    projectResult
+                            .addError("The project '" + project.getName() + "' is duplicated within the import file.");
                 }
             } else {
                 projectResult = validateProject(project);
@@ -262,6 +263,9 @@ public class ProjectValidationService {
      */
     private String extractGitHubOrg(String url) {
         try {
+            // Trim whitespace first
+            url = url.trim();
+
             // Eliminar .git i barres finals
             url = url.replace(".git", "").replaceAll("/$", "");
 
@@ -271,7 +275,12 @@ public class ProjectValidationService {
             // Buscar "github.com" i agafar el següent element (l'organització)
             for (int i = 0; i < parts.length; i++) {
                 if (parts[i].contains("github.com") && i + 1 < parts.length) {
-                    return parts[i + 1];
+                    String org = parts[i + 1].trim();
+                    // Skip "orgs" if it's part of the URL path
+                    if (org.equals("orgs") && i + 2 < parts.length) {
+                        return parts[i + 2].trim();
+                    }
+                    return org;
                 }
             }
         } catch (Exception e) {
@@ -286,10 +295,13 @@ public class ProjectValidationService {
      */
     private String extractTaigaSlug(String url) {
         try {
+            // Trim whitespace first
+            url = url.trim();
+
             if (url.contains("/project/")) {
                 String[] parts = url.split("/project/");
                 if (parts.length > 1) {
-                    String slug = parts[1].replaceAll("/$", "");
+                    String slug = parts[1].replaceAll("/$", "").trim();
                     return slug;
                 }
             }
