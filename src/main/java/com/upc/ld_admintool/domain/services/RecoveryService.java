@@ -80,6 +80,92 @@ public class RecoveryService {
         return result;
     }
 
+    public Map<String, Object> runGithubRecovery(Long projectId, Map<String, String> tokenOverrides) {
+        ProjectDTO project = ldService.getProjectById(projectId);
+        if (project == null) {
+            throw new IllegalArgumentException("Project not found");
+        }
+
+        String prj = project.getExternalId();
+        if (prj == null || prj.isBlank()) {
+            throw new IllegalArgumentException("Project externalId is required");
+        }
+
+        Map<DataSource, ProjectIdentityDTO> identities = project.getIdentities();
+        String githubUrl = extractIdentityUrl(identities, DataSource.GITHUB);
+
+        if (githubUrl == null || githubUrl.isBlank()) {
+            throw new IllegalArgumentException("Project GitHub identity URL is required");
+        }
+
+        String url = ldConnectUrl + "/admin/recovery/github";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("prj", prj);
+        payload.put("github_url", githubUrl);
+
+        if (tokenOverrides != null) {
+            String githubToken = tokenOverrides.get("githubToken");
+            if (githubToken != null && !githubToken.isBlank()) {
+                payload.put("github_token", githubToken);
+            }
+        }
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
+        ResponseEntity<Map> response = restTemplate.postForEntity(url, request, Map.class);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("projectId", projectId);
+        result.put("projectExternalId", prj);
+        result.put("recovery", response.getBody());
+        return result;
+    }
+
+    public Map<String, Object> runTaigaRecovery(Long projectId, Map<String, String> tokenOverrides) {
+        ProjectDTO project = ldService.getProjectById(projectId);
+        if (project == null) {
+            throw new IllegalArgumentException("Project not found");
+        }
+
+        String prj = project.getExternalId();
+        if (prj == null || prj.isBlank()) {
+            throw new IllegalArgumentException("Project externalId is required");
+        }
+
+        Map<DataSource, ProjectIdentityDTO> identities = project.getIdentities();
+        String taigaUrl = extractIdentityUrl(identities, DataSource.TAIGA);
+
+        if (taigaUrl == null || taigaUrl.isBlank()) {
+            throw new IllegalArgumentException("Project Taiga identity URL is required");
+        }
+
+        String url = ldConnectUrl + "/admin/recovery/taiga";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("prj", prj);
+        payload.put("taiga_url", taigaUrl);
+
+        if (tokenOverrides != null) {
+            String taigaToken = tokenOverrides.get("taigaToken");
+            if (taigaToken != null && !taigaToken.isBlank()) {
+                payload.put("taiga_token", taigaToken);
+            }
+        }
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
+        ResponseEntity<Map> response = restTemplate.postForEntity(url, request, Map.class);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("projectId", projectId);
+        result.put("projectExternalId", prj);
+        result.put("recovery", response.getBody());
+        return result;
+    }
+
     private String extractIdentityUrl(Map<DataSource, ProjectIdentityDTO> identities, DataSource source) {
         if (identities == null) {
             return null;

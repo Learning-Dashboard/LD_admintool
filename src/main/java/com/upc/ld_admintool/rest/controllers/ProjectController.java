@@ -90,6 +90,30 @@ public class ProjectController {
         }
     }
 
+    @PostMapping("/{id}/recover/github")
+    public ResponseEntity<?> triggerGithubRecovery(@PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> tokenOverrides) {
+        try {
+            return ResponseEntity.ok(recoveryService.runGithubRecovery(id, tokenOverrides));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{id}/recover/taiga")
+    public ResponseEntity<?> triggerTaigaRecovery(@PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> tokenOverrides) {
+        try {
+            return ResponseEntity.ok(recoveryService.runTaigaRecovery(id, tokenOverrides));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     // Modifica un projecte per id
     @PutMapping("/{id}")
     public ResponseEntity<?> modificarProjecte(@PathVariable Long id, @RequestBody ProjectDTO projecte) {
