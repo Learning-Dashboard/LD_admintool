@@ -82,7 +82,7 @@ public class ProjectController {
     public ResponseEntity<?> triggerRecovery(@PathVariable Long id,
             @RequestBody(required = false) Map<String, String> tokenOverrides) {
         try {
-            return ResponseEntity.ok(recoveryService.runTeamRecovery(id, tokenOverrides));
+            return ResponseEntity.accepted().body(recoveryService.runTeamRecovery(id, tokenOverrides));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -94,7 +94,7 @@ public class ProjectController {
     public ResponseEntity<?> triggerGithubRecovery(@PathVariable Long id,
             @RequestBody(required = false) Map<String, String> tokenOverrides) {
         try {
-            return ResponseEntity.ok(recoveryService.runGithubRecovery(id, tokenOverrides));
+            return ResponseEntity.accepted().body(recoveryService.runGithubRecovery(id, tokenOverrides));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -106,9 +106,18 @@ public class ProjectController {
     public ResponseEntity<?> triggerTaigaRecovery(@PathVariable Long id,
             @RequestBody(required = false) Map<String, String> tokenOverrides) {
         try {
-            return ResponseEntity.ok(recoveryService.runTaigaRecovery(id, tokenOverrides));
+            return ResponseEntity.accepted().body(recoveryService.runTaigaRecovery(id, tokenOverrides));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/recover/status/{jobId}")
+    public ResponseEntity<?> getRecoveryStatus(@PathVariable Long id, @PathVariable String jobId) {
+        try {
+            return ResponseEntity.ok(recoveryService.getRecoveryStatus(jobId));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
