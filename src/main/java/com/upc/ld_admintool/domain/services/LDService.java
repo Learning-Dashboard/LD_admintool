@@ -1,13 +1,18 @@
 package com.upc.ld_admintool.domain.services;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.http.client.ClientHttpRequestExecution;
+import org.springframework.http.client.ClientHttpRequestInterceptor;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.HttpClientErrorException;
 import com.upc.ld_admintool.rest.DTO.*;
 import com.upc.ld_admintool.domain.utils.DataSource;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,10 +25,27 @@ import java.nio.charset.StandardCharsets;
 @Service
 public class LDService {
 
+    static final String LD_API_KEY_HEADER = "X-LD-API-Key";
+
     @Value("${ld.api.url}")
     private String ldApiUrl; // http://localhost:8888/api
 
+    @Value("${ld.api.key:${LD_API_KEY:}}")
+    private String ldApiKey;
+
     private final RestTemplate restTemplate = new RestTemplate();
+
+    @PostConstruct
+    void configureApiKeyInterceptor() {
+        if (ldApiKey == null || ldApiKey.trim().isEmpty()) {
+            throw new IllegalStateException("LD_API_KEY must be configured for Learning Dashboard API calls");
+        }
+
+        List<ClientHttpRequestInterceptor> interceptors = new ArrayList<>(restTemplate.getInterceptors());
+        interceptors.removeIf(interceptor -> interceptor instanceof LdApiKeyInterceptor);
+        interceptors.add(new LdApiKeyInterceptor(ldApiKey.trim()));
+        restTemplate.setInterceptors(interceptors);
+    }
 
     // -------------------------------
     // Crear projecte al Learning Dashboard
@@ -393,6 +415,22 @@ public class LDService {
         } catch (HttpClientErrorException e) {
             System.err.println("Error fetching strategic indicators: " + e.getMessage());
             throw e;
+        }
+    }
+
+    private static class LdApiKeyInterceptor implements ClientHttpRequestInterceptor {
+        private final String apiKey;
+
+        private LdApiKeyInterceptor(String apiKey) {
+            this.apiKey = apiKey;
+        }
+
+        @Override
+        public ClientHttpResponse intercept(HttpRequest request,
+                                            byte[] body,
+                                            ClientHttpRequestExecution execution) throws IOException {
+            request.getHeaders().set(LD_API_KEY_HEADER, apiKey);
+            return execution.execute(request, body);
         }
     }
 
