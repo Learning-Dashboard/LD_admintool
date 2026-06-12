@@ -3,6 +3,7 @@ package com.upc.ld_admintool.rest.controllers;
 import java.util.List;
 import java.util.Map;
 import com.upc.ld_admintool.domain.services.ProjectService;
+import com.upc.ld_admintool.domain.services.RecoveryService;
 import com.upc.ld_admintool.domain.services.exceptions.SaveSyncException;
 import com.upc.ld_admintool.domain.services.validation.ProjectValidationService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +30,9 @@ public class ProjectController {
 
     @Autowired
     private ProjectValidationService validationService;
+
+    @Autowired
+    private RecoveryService recoveryService;
 
     // Llista tots els projectes
     @GetMapping
@@ -72,6 +76,51 @@ public class ProjectController {
                 request.getStudent());
 
         return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/{id}/recover")
+    public ResponseEntity<?> triggerRecovery(@PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> tokenOverrides) {
+        try {
+            return ResponseEntity.accepted().body(recoveryService.runTeamRecovery(id, tokenOverrides));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{id}/recover/github")
+    public ResponseEntity<?> triggerGithubRecovery(@PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> tokenOverrides) {
+        try {
+            return ResponseEntity.accepted().body(recoveryService.runGithubRecovery(id, tokenOverrides));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{id}/recover/taiga")
+    public ResponseEntity<?> triggerTaigaRecovery(@PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> tokenOverrides) {
+        try {
+            return ResponseEntity.accepted().body(recoveryService.runTaigaRecovery(id, tokenOverrides));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/recover/status/{jobId}")
+    public ResponseEntity<?> getRecoveryStatus(@PathVariable Long id, @PathVariable String jobId) {
+        try {
+            return ResponseEntity.ok(recoveryService.getRecoveryStatus(jobId));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
     }
 
     // Modifica un projecte per id

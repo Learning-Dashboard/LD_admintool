@@ -7,6 +7,8 @@ ld:
     key: ${LD_API_KEY:}
   eval:
     url: ${ADMINTOOL_EVAL_URL:http://localhost:5001}
+  connect:
+    url: ${ADMINTOOL_LD_CONNECT_URL:http://localhost:5000}
 
 spring:
   datasource:

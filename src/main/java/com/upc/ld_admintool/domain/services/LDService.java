@@ -3,6 +3,7 @@ package com.upc.ld_admintool.domain.services;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.http.client.ClientHttpRequestExecution;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.ClientHttpResponse;
@@ -33,14 +34,20 @@ public class LDService {
     @Value("${ld.api.key:${LD_API_KEY:}}")
     private String ldApiKey;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+
+    public LDService() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5_000);
+        factory.setReadTimeout(120_000);
+        this.restTemplate = new RestTemplate(factory);
+    }
 
     @PostConstruct
     void configureApiKeyInterceptor() {
         if (ldApiKey == null || ldApiKey.trim().isEmpty()) {
             throw new IllegalStateException("LD_API_KEY must be configured for Learning Dashboard API calls");
         }
-
         List<ClientHttpRequestInterceptor> interceptors = new ArrayList<>(restTemplate.getInterceptors());
         interceptors.removeIf(interceptor -> interceptor instanceof LdApiKeyInterceptor);
         interceptors.add(new LdApiKeyInterceptor(ldApiKey.trim()));
