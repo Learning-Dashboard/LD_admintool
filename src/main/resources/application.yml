@@ -4,6 +4,7 @@ server:
 ld:
   api:
     url: ${ADMINTOOL_LD_API_URL:https://eaa864cb69ae.ngrok-free.app/api}
+    key: ${LD_API_KEY:}
   eval:
     url: ${ADMINTOOL_EVAL_URL:http://localhost:5001}
   connect:

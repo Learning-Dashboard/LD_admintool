@@ -9,6 +9,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.*;
+import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
@@ -16,6 +17,9 @@ import org.springframework.web.client.RestTemplate;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -38,7 +42,29 @@ class LDServiceTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(ldService, "ldApiUrl", LD_API_URL);
+        ReflectionTestUtils.setField(ldService, "ldApiKey", "test-ld-api-key");
         ReflectionTestUtils.setField(ldService, "restTemplate", restTemplate);
+    }
+
+    @Test
+    @DisplayName("LDService debe añadir X-LD-API-Key a las llamadas salientes")
+    void outgoingRequestsIncludeApiKeyHeader() {
+        LDService serviceWithRealRestTemplate = new LDService();
+        ReflectionTestUtils.setField(serviceWithRealRestTemplate, "ldApiUrl", LD_API_URL);
+        ReflectionTestUtils.setField(serviceWithRealRestTemplate, "ldApiKey", "test-ld-api-key");
+        serviceWithRealRestTemplate.configureApiKeyInterceptor();
+
+        RestTemplate realRestTemplate = (RestTemplate) ReflectionTestUtils.getField(serviceWithRealRestTemplate, "restTemplate");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(realRestTemplate).build();
+        server.expect(requestTo(LD_API_URL + "/projects"))
+                .andExpect(header(LDService.LD_API_KEY_HEADER, "test-ld-api-key"))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+
+        List<ProjectDTO> projects = serviceWithRealRestTemplate.getAllProjects();
+
+        assertNotNull(projects);
+        assertTrue(projects.isEmpty());
+        server.verify();
     }
 
     @Test
