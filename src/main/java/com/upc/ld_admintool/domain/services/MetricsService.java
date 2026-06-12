@@ -1,4 +1,5 @@
 package com.upc.ld_admintool.domain.services;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import com.upc.ld_admintool.rest.DTO.MetricDTO;
 import org.springframework.stereotype.Service;
@@ -27,4 +28,8 @@ public class MetricsService {
         ldService.editMetric(id, threshold, url, categoryName, scope, project);
     }
 
-}   
+    public void importMetrics() {
+        ldService.importMetrics();
+    }
+
+}

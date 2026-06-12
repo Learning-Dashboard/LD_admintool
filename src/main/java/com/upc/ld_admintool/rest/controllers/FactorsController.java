@@ -1,4 +1,5 @@
 package com.upc.ld_admintool.rest.controllers;
+
 import com.upc.ld_admintool.domain.services.FactorsService;
 import com.upc.ld_admintool.rest.DTO.FactorDTO;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import java.util.List;
 import java.util.Map;
 
@@ -40,6 +42,12 @@ public class FactorsController {
             @RequestParam("category") String category,
             @RequestParam("prj") String project) {
         factorsService.updateFactorCategory(id, category, project);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/import")
+    public ResponseEntity<Void> importQualityFactors() {
+        factorsService.importQualityFactors();
         return ResponseEntity.ok().build();
     }
 }
