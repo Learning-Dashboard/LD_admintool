@@ -2,6 +2,7 @@ package com.upc.ld_admintool.domain.services;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.HttpClientErrorException;
@@ -23,7 +24,14 @@ public class LDService {
     @Value("${ld.api.url}")
     private String ldApiUrl; // http://localhost:8888/api
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+
+    public LDService() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5_000);
+        factory.setReadTimeout(120_000);
+        this.restTemplate = new RestTemplate(factory);
+    }
 
     // -------------------------------
     // Crear projecte al Learning Dashboard
