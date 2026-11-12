@@ -10,6 +10,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.*;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.mockito.ArgumentCaptor;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
@@ -262,5 +263,68 @@ class TaigaValidationServiceTest {
         // Assert
         assertFalse(result.isValid());
         assertTrue(result.hasErrors());
+    }
+
+    @Test
+    @DisplayName("un token de aplicación con dos puntos usa el esquema Application")
+    void testAuthorization_ApplicationToken() {
+        String applicationToken = "payload:timestamp:signature";
+        ReflectionTestUtils.setField(taigaValidationService, "taigaToken", applicationToken);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(new ResponseEntity<>("{\"id\":1}", HttpStatus.OK));
+
+        taigaValidationService.validateProjectBySlug("supertest");
+
+        assertEquals("Application " + applicationToken, capturedAuthorization());
+    }
+
+    @Test
+    @DisplayName("la validación de usuarios envía el mismo esquema Application")
+    void testAuthorization_UsersUseSameHelper() {
+        String applicationToken = "payload:timestamp:signature";
+        ReflectionTestUtils.setField(taigaValidationService, "taigaToken", applicationToken);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(new ResponseEntity<>("{\"members\":[]}", HttpStatus.OK));
+
+        taigaValidationService.validateUsersInProject("supertest", Arrays.asList("user1"));
+
+        assertEquals("Application " + applicationToken, capturedAuthorization());
+    }
+
+    @Test
+    @DisplayName("un JWT sin dos puntos sigue usando Bearer")
+    void testAuthorization_AccessJwtKeepsBearer() {
+        String accessToken = "eyJhbGciOiJIUzI1NiJ9.payload.signature";
+        ReflectionTestUtils.setField(taigaValidationService, "taigaToken", "Bearer " + accessToken);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(new ResponseEntity<>("{\"id\":1}", HttpStatus.OK));
+
+        taigaValidationService.validateProjectBySlug("supertest");
+
+        assertEquals("Bearer " + accessToken, capturedAuthorization());
+    }
+
+    @Test
+    @DisplayName("un prefijo Application guardado por error se quita una sola vez")
+    void testAuthorization_StripsOneApplicationPrefix() {
+        assertEquals(
+                "Application payload:timestamp:signature",
+                TaigaValidationService.taigaAuthorizationValue("Application payload:timestamp:signature"));
+    }
+
+    @Test
+    @DisplayName("un token vacío lanza error")
+    void testAuthorization_EmptyToken() {
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> TaigaValidationService.taigaAuthorizationValue("  "));
+        assertEquals("TAIGA_TOKEN is empty", error.getMessage());
+    }
+
+    @SuppressWarnings("unchecked")
+    private String capturedAuthorization() {
+        ArgumentCaptor<HttpEntity<String>> entityCaptor = ArgumentCaptor.forClass(HttpEntity.class);
+        verify(restTemplate).exchange(anyString(), eq(HttpMethod.GET), entityCaptor.capture(), eq(String.class));
+        return entityCaptor.getValue().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
     }
 }

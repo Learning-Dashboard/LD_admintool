@@ -160,10 +160,27 @@ public class TaigaValidationService {
     private HttpHeaders createHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-Type", "application/json");
-
-        if (taigaToken != null && !taigaToken.isEmpty()) {
-            headers.set("Authorization", "Bearer " + taigaToken);
-        }
+        headers.set("Authorization", taigaAuthorizationValue(taigaToken));
         return headers;
+    }
+
+    /**
+     * Application tokens contain colons and must use the Application scheme.
+     * Access JWTs have no colons and keep Bearer. A saved "Application " or
+     * "Bearer " prefix is stripped once so it is not sent twice.
+     */
+    static String taigaAuthorizationValue(String token) {
+        String raw = token == null ? "" : token.trim();
+        for (String prefix : new String[] {"Application ", "Bearer "}) {
+            if (raw.startsWith(prefix)) {
+                raw = raw.substring(prefix.length()).trim();
+                break;
+            }
+        }
+        if (raw.isEmpty()) {
+            throw new IllegalArgumentException("TAIGA_TOKEN is empty");
+        }
+        String scheme = raw.contains(":") ? "Application" : "Bearer";
+        return scheme + " " + raw;
     }
 }
