@@ -32,14 +32,12 @@ class StudentValidationDTOTest {
         studentValidation.setProjectId(100L);
         studentValidation.setGithubUrl("https://github.com/testorg");
         studentValidation.setTaigaUrl("https://tree.taiga.io/project/test");
-        studentValidation.setGithubToken("test-token");
         studentValidation.setStudent(student);
 
         // Assert
         assertEquals(100L, studentValidation.getProjectId());
         assertEquals("https://github.com/testorg", studentValidation.getGithubUrl());
         assertEquals("https://tree.taiga.io/project/test", studentValidation.getTaigaUrl());
-        assertEquals("test-token", studentValidation.getGithubToken());
         assertNotNull(studentValidation.getStudent());
         assertEquals("Test Student", studentValidation.getStudent().getName());
     }
@@ -51,14 +49,12 @@ class StudentValidationDTOTest {
         studentValidation.setProjectId(null);
         studentValidation.setGithubUrl(null);
         studentValidation.setTaigaUrl(null);
-        studentValidation.setGithubToken(null);
         studentValidation.setStudent(null);
 
         // Assert
         assertNull(studentValidation.getProjectId());
         assertNull(studentValidation.getGithubUrl());
         assertNull(studentValidation.getTaigaUrl());
-        assertNull(studentValidation.getGithubToken());
         assertNull(studentValidation.getStudent());
     }
 
@@ -136,7 +132,6 @@ class StudentValidationDTOTest {
         studentValidation.setProjectId(100L);
         studentValidation.setGithubUrl("https://github.com/myorg");
         studentValidation.setTaigaUrl("https://tree.taiga.io/project/myproject");
-        studentValidation.setGithubToken("ghp_123456");
         studentValidation.setStudent(student);
 
         // Assert
@@ -144,7 +139,6 @@ class StudentValidationDTOTest {
             () -> assertEquals(100L, studentValidation.getProjectId()),
             () -> assertEquals("https://github.com/myorg", studentValidation.getGithubUrl()),
             () -> assertEquals("https://tree.taiga.io/project/myproject", studentValidation.getTaigaUrl()),
-            () -> assertEquals("ghp_123456", studentValidation.getGithubToken()),
             () -> assertEquals(5L, studentValidation.getStudent().getId()),
             () -> assertEquals("John Doe", studentValidation.getStudent().getName())
         );
@@ -206,16 +200,6 @@ class StudentValidationDTOTest {
     }
 
     @Test
-    @DisplayName("Debe manejar tokens vacíos")
-    void testEmptyToken() {
-        // Act
-        studentValidation.setGithubToken("");
-
-        // Assert
-        assertEquals("", studentValidation.getGithubToken());
-    }
-
-    @Test
     @DisplayName("Debe manejar URLs vacías")
     void testEmptyUrls() {
         // Act
@@ -237,7 +221,6 @@ class StudentValidationDTOTest {
         assertNull(newValidation.getProjectId());
         assertNull(newValidation.getGithubUrl());
         assertNull(newValidation.getTaigaUrl());
-        assertNull(newValidation.getGithubToken());
         assertNull(newValidation.getStudent());
     }
 

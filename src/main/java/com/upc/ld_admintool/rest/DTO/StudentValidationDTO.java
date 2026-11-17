@@ -7,6 +7,5 @@ public class StudentValidationDTO {
     private Long projectId;
     private String githubUrl;
     private String taigaUrl;
-    private String githubToken;
     private StudentDTO student;
 }

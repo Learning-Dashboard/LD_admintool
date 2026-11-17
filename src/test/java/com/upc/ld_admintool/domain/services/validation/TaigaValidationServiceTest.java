@@ -1,6 +1,9 @@
 package com.upc.ld_admintool.domain.services.validation;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.upc.ld_admintool.domain.services.credentials.TaigaAuthService;
+import com.upc.ld_admintool.domain.services.credentials.TaigaContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -35,13 +38,19 @@ class TaigaValidationServiceTest {
     @InjectMocks
     private TaigaValidationService taigaValidationService;
 
-    private static final String TAIGA_API_URL = "https://api.taiga.io/api/v1";
+    private static final String TAIGA_API_URL = "https://taiga.subject.example/api/v1";
+    private static final String TAIGA_AUTH_URL = "https://taiga.subject.example/api/v1/auth";
     private static final String TAIGA_TOKEN = "test-token";
+
+    /** Taiga server and credentials of the subject of the project under validation. */
+    private TaigaContext taiga;
+    private TaigaAuthService taigaAuthService;
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(taigaValidationService, "taigaApiUrl", TAIGA_API_URL);
-        ReflectionTestUtils.setField(taigaValidationService, "taigaToken", TAIGA_TOKEN);
+        taiga = TaigaContext.withToken(TAIGA_API_URL, TAIGA_AUTH_URL, TAIGA_TOKEN);
+        taigaAuthService = new TaigaAuthService();
+        ReflectionTestUtils.setField(taigaValidationService, "taigaAuthService", taigaAuthService);
         ReflectionTestUtils.setField(taigaValidationService, "restTemplate", restTemplate);
         ReflectionTestUtils.setField(taigaValidationService, "objectMapper", new ObjectMapper());
     }
@@ -57,7 +66,7 @@ class TaigaValidationServiceTest {
                 .thenReturn(responseEntity);
 
         // Act
-        ValidationResult result = taigaValidationService.validateProjectBySlug(projectSlug);
+        ValidationResult result = taigaValidationService.validateProjectBySlug(projectSlug, taiga);
 
         // Assert
         assertTrue(result.isValid());
@@ -74,7 +83,7 @@ class TaigaValidationServiceTest {
                 .thenThrow(HttpClientErrorException.NotFound.create(HttpStatus.NOT_FOUND, "Not Found", null, null, null));
 
         // Act
-        ValidationResult result = taigaValidationService.validateProjectBySlug(projectSlug);
+        ValidationResult result = taigaValidationService.validateProjectBySlug(projectSlug, taiga);
 
         // Assert
         assertFalse(result.isValid());
@@ -85,7 +94,7 @@ class TaigaValidationServiceTest {
     @DisplayName("validateProjectBySlug debe retornar error si slug está vacío")
     void testValidateProjectBySlug_EmptySlug() {
         // Act
-        ValidationResult result = taigaValidationService.validateProjectBySlug("");
+        ValidationResult result = taigaValidationService.validateProjectBySlug("", taiga);
 
         // Assert
         assertFalse(result.isValid());
@@ -97,7 +106,7 @@ class TaigaValidationServiceTest {
     @DisplayName("validateProjectBySlug debe retornar error si slug es null")
     void testValidateProjectBySlug_NullSlug() {
         // Act
-        ValidationResult result = taigaValidationService.validateProjectBySlug(null);
+        ValidationResult result = taigaValidationService.validateProjectBySlug(null, taiga);
 
         // Assert
         assertFalse(result.isValid());
@@ -113,7 +122,7 @@ class TaigaValidationServiceTest {
                 .thenThrow(HttpClientErrorException.Unauthorized.create(HttpStatus.UNAUTHORIZED, "Unauthorized", null, null, null));
 
         // Act
-        ValidationResult result = taigaValidationService.validateProjectBySlug(projectSlug);
+        ValidationResult result = taigaValidationService.validateProjectBySlug(projectSlug, taiga);
 
         // Assert
         assertFalse(result.isValid());
@@ -129,7 +138,7 @@ class TaigaValidationServiceTest {
                 .thenThrow(HttpClientErrorException.Forbidden.create(HttpStatus.FORBIDDEN, "Forbidden", null, null, null));
 
         // Act
-        ValidationResult result = taigaValidationService.validateProjectBySlug(projectSlug);
+        ValidationResult result = taigaValidationService.validateProjectBySlug(projectSlug, taiga);
 
         // Assert
         assertTrue(result.isValid());
@@ -155,7 +164,7 @@ class TaigaValidationServiceTest {
                 .thenReturn(responseEntity);
 
         // Act
-        ValidationResult result = taigaValidationService.validateUsersInProject(projectSlug, usernames);
+        ValidationResult result = taigaValidationService.validateUsersInProject(projectSlug, usernames, taiga);
 
         // Assert
         assertTrue(result.isValid());
@@ -176,7 +185,7 @@ class TaigaValidationServiceTest {
                 .thenReturn(responseEntity);
 
         // Act
-        ValidationResult result = taigaValidationService.validateUsersInProject(projectSlug, usernames);
+        ValidationResult result = taigaValidationService.validateUsersInProject(projectSlug, usernames, taiga);
 
         // Assert
         assertFalse(result.isValid());
@@ -187,7 +196,7 @@ class TaigaValidationServiceTest {
     @DisplayName("validateUsersInProject debe retornar válido si lista de usuarios está vacía")
     void testValidateUsersInProject_EmptyList() {
         // Act
-        ValidationResult result = taigaValidationService.validateUsersInProject("test-project", Arrays.asList());
+        ValidationResult result = taigaValidationService.validateUsersInProject("test-project", Arrays.asList(), taiga);
 
         // Assert
         assertTrue(result.isValid());
@@ -198,7 +207,7 @@ class TaigaValidationServiceTest {
     @DisplayName("validateUsersInProject debe retornar válido si lista es null")
     void testValidateUsersInProject_NullList() {
         // Act
-        ValidationResult result = taigaValidationService.validateUsersInProject("test-project", null);
+        ValidationResult result = taigaValidationService.validateUsersInProject("test-project", null, taiga);
 
         // Assert
         assertTrue(result.isValid());
@@ -219,7 +228,7 @@ class TaigaValidationServiceTest {
                 .thenReturn(responseEntity);
 
         // Act
-        ValidationResult result = taigaValidationService.validateUsersInProject(projectSlug, usernames);
+        ValidationResult result = taigaValidationService.validateUsersInProject(projectSlug, usernames, taiga);
 
         // Assert - El código añade warning, no error
         assertTrue(result.isValid());
@@ -238,7 +247,7 @@ class TaigaValidationServiceTest {
                 .thenThrow(new HttpClientErrorException(HttpStatus.INTERNAL_SERVER_ERROR));
 
         // Act
-        ValidationResult result = taigaValidationService.validateUsersInProject(projectSlug, usernames);
+        ValidationResult result = taigaValidationService.validateUsersInProject(projectSlug, usernames, taiga);
 
         // Assert
         assertFalse(result.isValid());
@@ -258,7 +267,7 @@ class TaigaValidationServiceTest {
                 .thenReturn(responseEntity);
 
         // Act
-        ValidationResult result = taigaValidationService.validateUsersInProject(projectSlug, usernames);
+        ValidationResult result = taigaValidationService.validateUsersInProject(projectSlug, usernames, taiga);
 
         // Assert
         assertFalse(result.isValid());
@@ -269,11 +278,11 @@ class TaigaValidationServiceTest {
     @DisplayName("un token de aplicación con dos puntos usa el esquema Application")
     void testAuthorization_ApplicationToken() {
         String applicationToken = "payload:timestamp:signature";
-        ReflectionTestUtils.setField(taigaValidationService, "taigaToken", applicationToken);
+        taiga = TaigaContext.withToken(TAIGA_API_URL, TAIGA_AUTH_URL, applicationToken);
         when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
                 .thenReturn(new ResponseEntity<>("{\"id\":1}", HttpStatus.OK));
 
-        taigaValidationService.validateProjectBySlug("supertest");
+        taigaValidationService.validateProjectBySlug("supertest", taiga);
 
         assertEquals("Application " + applicationToken, capturedAuthorization());
     }
@@ -282,11 +291,11 @@ class TaigaValidationServiceTest {
     @DisplayName("la validación de usuarios envía el mismo esquema Application")
     void testAuthorization_UsersUseSameHelper() {
         String applicationToken = "payload:timestamp:signature";
-        ReflectionTestUtils.setField(taigaValidationService, "taigaToken", applicationToken);
+        taiga = TaigaContext.withToken(TAIGA_API_URL, TAIGA_AUTH_URL, applicationToken);
         when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
                 .thenReturn(new ResponseEntity<>("{\"members\":[]}", HttpStatus.OK));
 
-        taigaValidationService.validateUsersInProject("supertest", Arrays.asList("user1"));
+        taigaValidationService.validateUsersInProject("supertest", Arrays.asList("user1"), taiga);
 
         assertEquals("Application " + applicationToken, capturedAuthorization());
     }
@@ -295,30 +304,66 @@ class TaigaValidationServiceTest {
     @DisplayName("un JWT sin dos puntos sigue usando Bearer")
     void testAuthorization_AccessJwtKeepsBearer() {
         String accessToken = "eyJhbGciOiJIUzI1NiJ9.payload.signature";
-        ReflectionTestUtils.setField(taigaValidationService, "taigaToken", "Bearer " + accessToken);
+        taiga = TaigaContext.withToken(TAIGA_API_URL, TAIGA_AUTH_URL, "Bearer " + accessToken);
         when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
                 .thenReturn(new ResponseEntity<>("{\"id\":1}", HttpStatus.OK));
 
-        taigaValidationService.validateProjectBySlug("supertest");
+        taigaValidationService.validateProjectBySlug("supertest", taiga);
 
         assertEquals("Bearer " + accessToken, capturedAuthorization());
     }
 
     @Test
-    @DisplayName("un prefijo Application guardado por error se quita una sola vez")
-    void testAuthorization_StripsOneApplicationPrefix() {
-        assertEquals(
-                "Application payload:timestamp:signature",
-                TaigaValidationService.taigaAuthorizationValue("Application payload:timestamp:signature"));
+    @DisplayName("las peticiones van al servidor Taiga de la asignatura")
+    void testRequestsGoToSubjectServer() {
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(new ResponseEntity<>("{\"id\":1}", HttpStatus.OK));
+
+        taigaValidationService.validateProjectBySlug("supertest", taiga);
+        taigaValidationService.validateProjectBySlug("supertest",
+                TaigaContext.withToken("https://api.taiga.io/api/v1", "https://api.taiga.io/api/v1/auth", "tok"));
+
+        verify(restTemplate).exchange(eq(TAIGA_API_URL + "/projects/by_slug?slug=supertest"), eq(HttpMethod.GET),
+                any(HttpEntity.class), eq(String.class));
+        verify(restTemplate).exchange(eq("https://api.taiga.io/api/v1/projects/by_slug?slug=supertest"),
+                eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class));
     }
 
     @Test
-    @DisplayName("un token vacío lanza error")
-    void testAuthorization_EmptyToken() {
-        IllegalArgumentException error = assertThrows(
-                IllegalArgumentException.class,
-                () -> TaigaValidationService.taigaAuthorizationValue("  "));
-        assertEquals("TAIGA_TOKEN is empty", error.getMessage());
+    @DisplayName("sin token se hace login en el auth URL de la asignatura")
+    void testAuthorization_LoginWhenNoToken() {
+        RestTemplate loginRestTemplate = mock(RestTemplate.class);
+        ReflectionTestUtils.setField(taigaAuthService, "restTemplate", loginRestTemplate);
+        when(loginRestTemplate.postForObject(eq(TAIGA_AUTH_URL), any(), eq(JsonNode.class)))
+                .thenReturn(new ObjectMapper().createObjectNode().put("auth_token", "login-jwt"));
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(new ResponseEntity<>("{\"id\":1}", HttpStatus.OK));
+
+        ValidationResult result = taigaValidationService.validateProjectBySlug("supertest",
+                TaigaContext.withLogin(TAIGA_API_URL, TAIGA_AUTH_URL, "user", "pass"));
+
+        assertTrue(result.isValid());
+        assertEquals("Bearer login-jwt", capturedAuthorization());
+    }
+
+    @Test
+    @DisplayName("si el login falla no se hace ninguna petición anónima")
+    void testAuthorization_LoginFailure() {
+        RestTemplate loginRestTemplate = mock(RestTemplate.class);
+        ReflectionTestUtils.setField(taigaAuthService, "restTemplate", loginRestTemplate);
+        when(loginRestTemplate.postForObject(eq(TAIGA_AUTH_URL), any(), eq(JsonNode.class)))
+                .thenThrow(HttpClientErrorException.create(HttpStatus.UNAUTHORIZED, "Unauthorized", null, null, null));
+        TaigaContext login = TaigaContext.withLogin(TAIGA_API_URL, TAIGA_AUTH_URL, "user", "pass");
+
+        ValidationResult projectResult = taigaValidationService.validateProjectBySlug("supertest", login);
+        ValidationResult usersResult = taigaValidationService.validateUsersInProject("supertest",
+                Arrays.asList("user1"), login);
+
+        assertFalse(projectResult.isValid());
+        assertTrue(projectResult.getErrors().get(0).contains("Taiga login failed at " + TAIGA_AUTH_URL));
+        assertFalse(usersResult.isValid());
+        assertTrue(usersResult.getErrors().get(0).contains("Taiga login failed at " + TAIGA_AUTH_URL));
+        verifyNoInteractions(restTemplate);
     }
 
     @SuppressWarnings("unchecked")

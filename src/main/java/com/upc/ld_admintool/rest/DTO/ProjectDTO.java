@@ -18,8 +18,6 @@ public class ProjectDTO {
     private boolean anonymized;
     private String subject;
 
-    private String githubToken;
-
     private Map<DataSource, ProjectIdentityDTO> identities;
     private List<StudentDTO> students;
 }

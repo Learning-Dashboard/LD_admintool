@@ -2,33 +2,37 @@ package com.upc.ld_admintool.domain.services.validation;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Value;
+import com.upc.ld_admintool.domain.services.credentials.TaigaAuthService;
+import com.upc.ld_admintool.domain.services.credentials.TaigaContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.HttpClientErrorException;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * Valida projectes i usuaris al servidor Taiga de l'assignatura del projecte.
+ * Cada assignatura pot tenir un servidor Taiga diferent, per això totes les
+ * validacions reben el TaigaContext de l'assignatura.
+ */
 @Service
 public class TaigaValidationService {
 
-    @Value("${taiga.api.url:https://api.taiga.io/api/v1}")
-    private String taigaApiUrl;
-
-    @Value("${taiga.token:}")
-    private String taigaToken;
+    @Autowired
+    private TaigaAuthService taigaAuthService;
 
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
-     * Valida si un projecte de Taiga existeix per slug
+     * Valida si un projecte de Taiga existeix per slug al servidor Taiga de
+     * l'assignatura
      */
-    public ValidationResult validateProjectBySlug(String projectSlug) {
+    public ValidationResult validateProjectBySlug(String projectSlug, TaigaContext taiga) {
         ValidationResult result = new ValidationResult(true);
 
         if (projectSlug == null || projectSlug.trim().isEmpty()) {
@@ -37,10 +41,10 @@ public class TaigaValidationService {
         }
 
         try {
-            String url = taigaApiUrl + "/projects/by_slug?slug=" + projectSlug;
+            String url = taiga.apiUrl() + "/projects/by_slug?slug=" + projectSlug;
             System.out.println("🔍 Validating Taiga project: " + url);
 
-            HttpHeaders headers = createHeaders();
+            HttpHeaders headers = createHeaders(taiga);
             HttpEntity<String> entity = new HttpEntity<>(headers);
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
 
@@ -58,7 +62,7 @@ public class TaigaValidationService {
         } catch (HttpClientErrorException.Unauthorized e) {
             System.err.println("❌ Taiga project '" + projectSlug + "' unauthorized (401)");
             result.addError("No tens autorització per accedir al projecte Taiga '" + projectSlug
-                    + "' (comprova el token de Taiga)");
+                    + "' (comprova les credencials de Taiga de l'assignatura)");
         } catch (HttpClientErrorException.Forbidden e) {
             System.err.println("⚠️ Taiga project '" + projectSlug + "' forbidden (403)");
             result.addWarning("El projecte Taiga '" + projectSlug + "' és privat o no tens permisos");
@@ -73,9 +77,10 @@ public class TaigaValidationService {
     }
 
     /**
-     * Valida si els usuaris existeixen com a membres del projecte Taiga
+     * Valida si els usuaris existeixen com a membres del projecte Taiga al
+     * servidor Taiga de l'assignatura
      */
-    public ValidationResult validateUsersInProject(String projectSlug, List<String> usernames) {
+    public ValidationResult validateUsersInProject(String projectSlug, List<String> usernames, TaigaContext taiga) {
         ValidationResult result = new ValidationResult(true);
 
         if (usernames == null || usernames.isEmpty()) {
@@ -83,10 +88,10 @@ public class TaigaValidationService {
         }
 
         try {
-            String url = taigaApiUrl + "/projects/by_slug?slug=" + projectSlug;
+            String url = taiga.apiUrl() + "/projects/by_slug?slug=" + projectSlug;
             System.out.println("🔍 Validating users in Taiga project: " + url);
 
-            HttpHeaders headers = createHeaders();
+            HttpHeaders headers = createHeaders(taiga);
             HttpEntity<String> entity = new HttpEntity<>(headers);
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
 
@@ -142,7 +147,7 @@ public class TaigaValidationService {
         } catch (HttpClientErrorException.Unauthorized e) {
             System.err.println("❌ Taiga project '" + projectSlug + "' unauthorized (401) during user validation");
             result.addError("No tens autorització per accedir al projecte Taiga '" + projectSlug
-                    + "' (comprova el token de Taiga)");
+                    + "' (comprova les credencials de Taiga de l'assignatura)");
         } catch (HttpClientErrorException.Forbidden e) {
             System.err.println("⚠️ Taiga project '" + projectSlug + "' forbidden (403) during user validation");
             result.addWarning(
@@ -157,30 +162,10 @@ public class TaigaValidationService {
         return result;
     }
 
-    private HttpHeaders createHeaders() {
+    private HttpHeaders createHeaders(TaigaContext taiga) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-Type", "application/json");
-        headers.set("Authorization", taigaAuthorizationValue(taigaToken));
+        headers.set("Authorization", taigaAuthService.authorizationValue(taiga));
         return headers;
-    }
-
-    /**
-     * Application tokens contain colons and must use the Application scheme.
-     * Access JWTs have no colons and keep Bearer. A saved "Application " or
-     * "Bearer " prefix is stripped once so it is not sent twice.
-     */
-    static String taigaAuthorizationValue(String token) {
-        String raw = token == null ? "" : token.trim();
-        for (String prefix : new String[] {"Application ", "Bearer "}) {
-            if (raw.startsWith(prefix)) {
-                raw = raw.substring(prefix.length()).trim();
-                break;
-            }
-        }
-        if (raw.isEmpty()) {
-            throw new IllegalArgumentException("TAIGA_TOKEN is empty");
-        }
-        String scheme = raw.contains(":") ? "Application" : "Bearer";
-        return scheme + " " + raw;
     }
 }

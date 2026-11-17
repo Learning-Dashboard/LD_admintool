@@ -15,19 +15,16 @@ public class GitHubValidationService {
     @Value("${github.api.url:https://api.github.com}")
     private String githubApiUrl;
 
-    @Value("${github.token:}")
-    private String githubToken;
-
     private final RestTemplate restTemplate = new RestTemplate();
 
     /**
      * Valida si una organització de GitHub existeix.
      * 
-     * @param org          Nom de l'organització
-     * @param projectToken Token específic per aquest projecte (pot ser null)
+     * @param org         Nom de l'organització
+     * @param githubToken Token de GitHub de l'assignatura del projecte
      * @return ValidationResult amb errors si l'organització no existeix
      */
-    public ValidationResult validateOrganization(String org, String projectToken) {
+    public ValidationResult validateOrganization(String org, String githubToken) {
         ValidationResult result = new ValidationResult(true);
 
         if (org == null || org.trim().isEmpty()) {
@@ -37,7 +34,7 @@ public class GitHubValidationService {
 
         try {
             String url = githubApiUrl + "/orgs/" + org + "/members";
-            HttpHeaders headers = createHeaders(projectToken);
+            HttpHeaders headers = createHeaders(githubToken);
             HttpEntity<String> entity = new HttpEntity<>(headers);
             ResponseEntity<Object[]> response = restTemplate.exchange(url, HttpMethod.GET, entity, Object[].class);
 
@@ -63,12 +60,12 @@ public class GitHubValidationService {
     /**
      * Valida si múltiples usuaris són membres d'una organització.
      * 
-     * @param org          Nom de l'organització
-     * @param usernames    Llista de noms d'usuari
-     * @param projectToken Token específic per aquest projecte (pot ser null)
+     * @param org         Nom de l'organització
+     * @param usernames   Llista de noms d'usuari
+     * @param githubToken Token de GitHub de l'assignatura del projecte
      * @return ValidationResult amb errors per cada usuari que no és membre
      */
-    public ValidationResult validateUsersInOrganization(String org, List<String> usernames, String projectToken) {
+    public ValidationResult validateUsersInOrganization(String org, List<String> usernames, String githubToken) {
         ValidationResult result = new ValidationResult(true);
 
         if (usernames == null || usernames.isEmpty()) {
@@ -77,7 +74,7 @@ public class GitHubValidationService {
 
         try {
             String url = githubApiUrl + "/orgs/" + org + "/members";
-            HttpHeaders headers = createHeaders(projectToken);
+            HttpHeaders headers = createHeaders(githubToken);
             HttpEntity<String> entity = new HttpEntity<>(headers);
 
             ResponseEntity<Object[]> response = restTemplate.exchange(url, HttpMethod.GET, entity, Object[].class);
@@ -127,16 +124,16 @@ public class GitHubValidationService {
     /**
      * Valida si un usuari de GitHub existeix.
      * 
-     * @param username     Nom d'usuari
-     * @param projectToken Token específic per aquest projecte (pot ser null)
+     * @param username    Nom d'usuari
+     * @param githubToken Token de GitHub de l'assignatura del projecte
      * @return ValidationResult amb errors si l'usuari no existeix
      */
-    public ValidationResult validateUser(String username, String projectToken) {
+    public ValidationResult validateUser(String username, String githubToken) {
         ValidationResult result = new ValidationResult(true);
 
         try {
             String url = githubApiUrl + "/users/" + username;
-            HttpHeaders headers = createHeaders(projectToken);
+            HttpHeaders headers = createHeaders(githubToken);
             HttpEntity<String> entity = new HttpEntity<>(headers);
 
             ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
@@ -156,26 +153,18 @@ public class GitHubValidationService {
     /**
      * Crea headers HTTP per les peticions a GitHub API.
      * 
-     * @param projectToken Token específic del projecte (prioritat sobre el token
-     *                     global)
-     * @return HttpHeaders amb el token corresponent
+     * @param githubToken Token de GitHub de l'assignatura del projecte. No hi ha
+     *                    token global: sense token no es fa cap petició.
+     * @return HttpHeaders amb el token
      */
-    private HttpHeaders createHeaders(String projectToken) {
+    private HttpHeaders createHeaders(String githubToken) {
+        if (githubToken == null || githubToken.trim().isEmpty()) {
+            throw new IllegalArgumentException("The GitHub token of the subject is empty");
+        }
+
         HttpHeaders headers = new HttpHeaders();
         headers.set("Accept", "application/vnd.github.v3+json");
-
-        // Prioritat: 1) Token del projecte, 2) Token global, 3) Sense token
-        String tokenToUse = null;
-        if (projectToken != null && !projectToken.trim().isEmpty()) {
-            tokenToUse = projectToken.trim();
-        } else if (githubToken != null && !githubToken.isEmpty()) {
-            tokenToUse = githubToken;
-        }
-
-        if (tokenToUse != null) {
-            headers.set("Authorization", "token " + tokenToUse);
-        }
-
+        headers.set("Authorization", "token " + githubToken.trim());
         return headers;
     }
 }

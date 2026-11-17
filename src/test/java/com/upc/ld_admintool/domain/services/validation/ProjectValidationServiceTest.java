@@ -1,6 +1,10 @@
 package com.upc.ld_admintool.domain.services.validation;
 
 import com.upc.ld_admintool.domain.services.LDService;
+import com.upc.ld_admintool.domain.services.credentials.CredentialsConfigException;
+import com.upc.ld_admintool.domain.services.credentials.SubjectCredentials;
+import com.upc.ld_admintool.domain.services.credentials.SubjectCredentialsService;
+import com.upc.ld_admintool.domain.services.credentials.TaigaContext;
 import com.upc.ld_admintool.domain.utils.DataSource;
 import com.upc.ld_admintool.rest.DTO.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,15 +38,32 @@ class ProjectValidationServiceTest {
     @Mock
     private LDService ldService;
 
+    @Mock
+    private SubjectCredentialsService subjectCredentialsService;
+
     @InjectMocks
     private ProjectValidationService projectValidationService;
+
+    private static final String SUBJECT = "AMEP";
+    private static final String GITHUB_TOKEN = "github-token";
+    private static final TaigaContext TAIGA = TaigaContext.withToken(
+            "https://taiga.amep.example/api/v1", "https://taiga.amep.example/api/v1/auth", "taiga-token");
+    /** Credentials config entry of the subject: both test teams are listed under it. */
+    private static final SubjectCredentials CREDENTIALS = new SubjectCredentials(
+            SUBJECT, GITHUB_TOKEN, TAIGA, List.of("test-project", "project-2"));
+
+    private static final String OTHER_SUBJECT = "ASW";
+    private static final TaigaContext OTHER_TAIGA = TaigaContext.withLogin(
+            "https://api.taiga.io/api/v1", "https://api.taiga.io/api/v1/auth", "fallback_user", "fallback_pass");
+    private static final SubjectCredentials OTHER_CREDENTIALS = new SubjectCredentials(
+            OTHER_SUBJECT, "other-github-token", OTHER_TAIGA, List.of("asw-team"));
 
     private ProjectDTO createValidProject() {
         ProjectDTO project = new ProjectDTO();
         project.setId(1L);
         project.setName("Test Project");
         project.setExternalId("test-project");
-        project.setGithubToken("github-token");
+        project.setSubject(SUBJECT);
 
         Map<DataSource, ProjectIdentityDTO> identities = new HashMap<>();
         
@@ -81,15 +102,26 @@ class ProjectValidationServiceTest {
         return student;
     }
 
+    /** A valid project whose identities are replaced by the given ones. */
+    private ProjectDTO createProjectWithIdentities(Map<DataSource, ProjectIdentityDTO> identities) {
+        ProjectDTO project = createValidProject();
+        project.setIdentities(identities);
+        return project;
+    }
+
     @BeforeEach
     void setUp() {
+        lenient().when(subjectCredentialsService.resolveBySubject(SUBJECT)).thenReturn(CREDENTIALS);
+        lenient().when(subjectCredentialsService.resolveBySubject(OTHER_SUBJECT)).thenReturn(OTHER_CREDENTIALS);
+        lenient().when(ldService.getProjectById(1L)).thenAnswer(invocation -> createValidProject());
+
         lenient().when(githubValidationService.validateOrganization(anyString(), anyString()))
                 .thenReturn(new ValidationResult(true));
         lenient().when(githubValidationService.validateUsersInOrganization(anyString(), anyList(), anyString()))
                 .thenReturn(new ValidationResult(true));
-        lenient().when(taigaValidationService.validateProjectBySlug(anyString()))
+        lenient().when(taigaValidationService.validateProjectBySlug(anyString(), any(TaigaContext.class)))
                 .thenReturn(new ValidationResult(true));
-        lenient().when(taigaValidationService.validateUsersInProject(anyString(), anyList()))
+        lenient().when(taigaValidationService.validateUsersInProject(anyString(), anyList(), any(TaigaContext.class)))
                 .thenReturn(new ValidationResult(true));
     }
 
@@ -105,8 +137,8 @@ class ProjectValidationServiceTest {
         // Assert
         assertTrue(result.isValid());
         assertFalse(result.hasErrors());
-        verify(githubValidationService).validateOrganization("testorg", "github-token");
-        verify(taigaValidationService).validateProjectBySlug("testuser-testproject");
+        verify(githubValidationService).validateOrganization("testorg", GITHUB_TOKEN);
+        verify(taigaValidationService).validateProjectBySlug("testuser-testproject", TAIGA);
     }
 
     @Test
@@ -146,15 +178,12 @@ class ProjectValidationServiceTest {
     @DisplayName("validateProject debe agregar warning si no tiene URL de GitHub")
     void testValidateProject_NoGitHubURL() {
         // Arrange
-        ProjectDTO project = new ProjectDTO();
-        project.setName("Test Project");
-        
         Map<DataSource, ProjectIdentityDTO> identities = new HashMap<>();
         ProjectIdentityDTO taigaIdentity = new ProjectIdentityDTO();
         taigaIdentity.setUrl("https://tree.taiga.io/project/test/");
         identities.put(DataSource.TAIGA, taigaIdentity);
-        
-        project.setIdentities(identities);
+
+        ProjectDTO project = createProjectWithIdentities(identities);
 
         // Act
         ValidationResult result = projectValidationService.validateProject(project);
@@ -169,19 +198,12 @@ class ProjectValidationServiceTest {
     @DisplayName("validateProject debe agregar warning si no tiene URL de Taiga")
     void testValidateProject_NoTaigaURL() {
         // Arrange
-        ProjectDTO project = new ProjectDTO();
-        project.setName("Test Project");
-        
         Map<DataSource, ProjectIdentityDTO> identities = new HashMap<>();
         ProjectIdentityDTO githubIdentity = new ProjectIdentityDTO();
         githubIdentity.setUrl("https://github.com/testorg");
         identities.put(DataSource.GITHUB, githubIdentity);
-        
-        project.setIdentities(identities);
 
-        // Mock explícito para este test
-        when(githubValidationService.validateOrganization("testorg", null))
-                .thenReturn(new ValidationResult(true));
+        ProjectDTO project = createProjectWithIdentities(identities);
 
         // Act
         ValidationResult result = projectValidationService.validateProject(project);
@@ -211,7 +233,7 @@ class ProjectValidationServiceTest {
         verify(githubValidationService).validateUsersInOrganization(
                 eq("testorg"),
                 argThat(list -> list.size() == 2 && list.contains("github1") && list.contains("github2")),
-                eq("github-token")
+                eq(GITHUB_TOKEN)
         );
     }
 
@@ -233,7 +255,8 @@ class ProjectValidationServiceTest {
         assertTrue(result.isValid());
         verify(taigaValidationService).validateUsersInProject(
                 eq("testuser-testproject"),
-                argThat(list -> list.size() == 2 && list.contains("taiga1") && list.contains("taiga2"))
+                argThat(list -> list.size() == 2 && list.contains("taiga1") && list.contains("taiga2")),
+                eq(TAIGA)
         );
     }
 
@@ -241,15 +264,12 @@ class ProjectValidationServiceTest {
     @DisplayName("validateProject debe manejar URL de GitHub inválida")
     void testValidateProject_InvalidGitHubURL() {
         // Arrange
-        ProjectDTO project = new ProjectDTO();
-        project.setName("Test Project");
-        
         Map<DataSource, ProjectIdentityDTO> identities = new HashMap<>();
         ProjectIdentityDTO githubIdentity = new ProjectIdentityDTO();
         githubIdentity.setUrl("invalid-url");
         identities.put(DataSource.GITHUB, githubIdentity);
-        
-        project.setIdentities(identities);
+
+        ProjectDTO project = createProjectWithIdentities(identities);
 
         // Act
         ValidationResult result = projectValidationService.validateProject(project);
@@ -264,15 +284,12 @@ class ProjectValidationServiceTest {
     @DisplayName("validateProject debe manejar URL de Taiga inválida")
     void testValidateProject_InvalidTaigaURL() {
         // Arrange
-        ProjectDTO project = new ProjectDTO();
-        project.setName("Test Project");
-        
         Map<DataSource, ProjectIdentityDTO> identities = new HashMap<>();
         ProjectIdentityDTO taigaIdentity = new ProjectIdentityDTO();
         taigaIdentity.setUrl("invalid-taiga-url");
         identities.put(DataSource.TAIGA, taigaIdentity);
-        
-        project.setIdentities(identities);
+
+        ProjectDTO project = createProjectWithIdentities(identities);
 
         // Act
         ValidationResult result = projectValidationService.validateProject(project);
@@ -310,7 +327,7 @@ class ProjectValidationServiceTest {
         ValidationResult taigaError = new ValidationResult(false);
         taigaError.addError("Taiga project not found");
         
-        when(taigaValidationService.validateProjectBySlug(anyString()))
+        when(taigaValidationService.validateProjectBySlug(anyString(), any(TaigaContext.class)))
                 .thenReturn(taigaError);
 
         // Act
@@ -391,7 +408,7 @@ class ProjectValidationServiceTest {
     }
 
     @Test
-    @DisplayName("validateStudent debe validar un estudiante correctamente")
+    @DisplayName("validateStudent debe validar un estudiante con las credenciales de la asignatura del proyecto")
     void testValidateStudent_ValidStudent() {
         // Arrange
         StudentDTO student = createStudent("Test Student", "github1", "taiga1");
@@ -400,18 +417,19 @@ class ProjectValidationServiceTest {
 
         // Act
         ValidationResult result = projectValidationService.validateStudent(
-                githubUrl, taigaUrl, "token", student);
+                1L, githubUrl, taigaUrl, student);
 
         // Assert
         assertTrue(result.isValid());
         verify(githubValidationService).validateUsersInOrganization(
                 eq("testorg"),
                 argThat(list -> list.contains("github1")),
-                eq("token")
+                eq(GITHUB_TOKEN)
         );
         verify(taigaValidationService).validateUsersInProject(
                 eq("testuser-testproject"),
-                argThat(list -> list.contains("taiga1"))
+                argThat(list -> list.contains("taiga1")),
+                eq(TAIGA)
         );
     }
 
@@ -420,7 +438,7 @@ class ProjectValidationServiceTest {
     void testValidateStudent_NullStudent() {
         // Act
         ValidationResult result = projectValidationService.validateStudent(
-                "url", "url", "token", null);
+                1L, "url", "url", null);
 
         // Assert
         assertFalse(result.isValid());
@@ -437,7 +455,7 @@ class ProjectValidationServiceTest {
 
         // Act
         ValidationResult result = projectValidationService.validateStudent(
-                "url", "url", "token", student);
+                1L, "url", "url", student);
 
         // Assert
         assertFalse(result.isValid());
@@ -452,12 +470,51 @@ class ProjectValidationServiceTest {
 
         // Act
         ValidationResult result = projectValidationService.validateStudent(
-                null, null, "token", student);
+                1L, null, null, student);
 
         // Assert
         assertTrue(result.isValid());
         verify(githubValidationService, never()).validateUsersInOrganization(anyString(), anyList(), anyString());
-        verify(taigaValidationService, never()).validateUsersInProject(anyString(), anyList());
+        verify(taigaValidationService, never()).validateUsersInProject(anyString(), anyList(), any());
+    }
+
+    @Test
+    @DisplayName("validateStudent debe retornar error si el proyecto no existe")
+    void testValidateStudent_ProjectNotFound() {
+        // Arrange
+        StudentDTO student = createStudent("Test", "github1", "taiga1");
+        when(ldService.getProjectById(99L)).thenReturn(null);
+
+        // Act
+        ValidationResult unknownProject = projectValidationService.validateStudent(
+                99L, "https://github.com/testorg", null, student);
+        ValidationResult noProject = projectValidationService.validateStudent(
+                null, "https://github.com/testorg", null, student);
+
+        // Assert
+        for (ValidationResult result : Arrays.asList(unknownProject, noProject)) {
+            assertFalse(result.isValid());
+            assertTrue(result.getErrors().get(0).contains("project of the student was not found"));
+        }
+        verifyNoInteractions(githubValidationService, taigaValidationService, subjectCredentialsService);
+    }
+
+    @Test
+    @DisplayName("validateStudent debe retornar error si la asignatura no tiene credenciales")
+    void testValidateStudent_CredentialsNotResolved() {
+        // Arrange
+        StudentDTO student = createStudent("Test", "github1", "taiga1");
+        when(subjectCredentialsService.resolveBySubject(SUBJECT))
+                .thenThrow(new CredentialsConfigException("Subject 'AMEP' has no github_token."));
+
+        // Act
+        ValidationResult result = projectValidationService.validateStudent(
+                1L, "https://github.com/testorg", "https://tree.taiga.io/project/slug/", student);
+
+        // Assert
+        assertFalse(result.isValid());
+        assertTrue(result.getErrors().get(0).contains("Subject 'AMEP' has no github_token."));
+        verifyNoInteractions(githubValidationService, taigaValidationService);
     }
 
     @Test
@@ -477,24 +534,128 @@ class ProjectValidationServiceTest {
     }
 
     @Test
-    @DisplayName("validateProject debe manejar proyecto sin token GitHub")
-    void testValidateProject_NoGitHubToken() {
+    @DisplayName("validateProject debe usar el token GitHub y el servidor Taiga de la asignatura de cada proyecto")
+    void testValidateProject_EachSubjectUsesItsOwnCredentials() {
+        // Arrange
+        ProjectDTO amepProject = createValidProject();
+        amepProject.setStudents(Arrays.asList(createStudent("Student 1", "github1", "taiga1")));
+
+        ProjectDTO aswProject = createValidProject();
+        aswProject.setExternalId("asw-team");
+        aswProject.setSubject(OTHER_SUBJECT);
+        aswProject.setStudents(Arrays.asList(createStudent("Student 2", "github2", "taiga2")));
+
+        // Act
+        assertTrue(projectValidationService.validateProject(amepProject).isValid());
+        assertTrue(projectValidationService.validateProject(aswProject).isValid());
+
+        // Assert
+        verify(githubValidationService).validateOrganization("testorg", GITHUB_TOKEN);
+        verify(githubValidationService).validateOrganization("testorg", "other-github-token");
+        verify(githubValidationService).validateUsersInOrganization(eq("testorg"), anyList(), eq(GITHUB_TOKEN));
+        verify(githubValidationService).validateUsersInOrganization(eq("testorg"), anyList(),
+                eq("other-github-token"));
+        verify(taigaValidationService).validateProjectBySlug("testuser-testproject", TAIGA);
+        verify(taigaValidationService).validateProjectBySlug("testuser-testproject", OTHER_TAIGA);
+        verify(taigaValidationService).validateUsersInProject(eq("testuser-testproject"), anyList(), eq(TAIGA));
+        verify(taigaValidationService).validateUsersInProject(eq("testuser-testproject"), anyList(),
+                eq(OTHER_TAIGA));
+    }
+
+    @Test
+    @DisplayName("validateProject debe retornar error si la asignatura no tiene credenciales")
+    void testValidateProject_CredentialsNotResolved() {
         // Arrange
         ProjectDTO project = createValidProject();
-        project.setGithubToken(null);
-
-        // Mock explícito para este test
-        when(githubValidationService.validateOrganization("testorg", null))
-                .thenReturn(new ValidationResult(true));
-        when(taigaValidationService.validateProjectBySlug("testuser-testproject"))
-                .thenReturn(new ValidationResult(true));
+        project.setSubject("Unknown Subject");
+        when(subjectCredentialsService.resolveBySubject("Unknown Subject")).thenThrow(
+                new CredentialsConfigException("Subject 'Unknown Subject' is not defined in the credentials config."));
 
         // Act
         ValidationResult result = projectValidationService.validateProject(project);
 
         // Assert
-        assertTrue(result.isValid());
-        verify(githubValidationService).validateOrganization("testorg", null);
+        assertFalse(result.isValid());
+        assertEquals(1, result.getErrors().size());
+        assertTrue(result.getErrors().get(0).contains("Test Project"));
+        assertTrue(result.getErrors().get(0).contains("'Unknown Subject' is not defined"));
+        verifyNoInteractions(githubValidationService, taigaValidationService);
+    }
+
+    @Test
+    @DisplayName("validateProject debe retornar error si el proyecto no tiene asignatura")
+    void testValidateProject_NoSubject() {
+        // Arrange
+        ProjectDTO project = createValidProject();
+        project.setSubject(null);
+        when(subjectCredentialsService.resolveBySubject(null))
+                .thenThrow(new CredentialsConfigException("The subject is empty, so its credentials cannot be resolved."));
+
+        // Act
+        ValidationResult result = projectValidationService.validateProject(project);
+
+        // Assert
+        assertFalse(result.isValid());
+        assertTrue(result.getErrors().get(0).contains("The subject is empty"));
+        verifyNoInteractions(githubValidationService, taigaValidationService);
+    }
+
+    @Test
+    @DisplayName("validateProject debe retornar error si el equipo no está en 'teams' de su asignatura")
+    void testValidateProject_TeamNotListedUnderSubject() {
+        // Arrange: the team is listed under ASW, but the project says AMEP
+        ProjectDTO project = createValidProject();
+        project.setExternalId("asw-team");
+
+        // Act
+        ValidationResult result = projectValidationService.validateProject(project);
+
+        // Assert
+        assertFalse(result.isValid());
+        assertEquals(1, result.getErrors().size());
+        assertTrue(result.getErrors().get(0).contains("team 'asw-team'"));
+        assertTrue(result.getErrors().get(0).contains("is not listed in 'teams' of subject 'AMEP'"));
+        verifyNoInteractions(githubValidationService, taigaValidationService);
+    }
+
+    @Test
+    @DisplayName("validateProject debe retornar error si el proyecto no tiene externalId")
+    void testValidateProject_NoExternalId() {
+        // Arrange
+        ProjectDTO project = createValidProject();
+        project.setExternalId(null);
+
+        // Act
+        ValidationResult result = projectValidationService.validateProject(project);
+
+        // Assert
+        assertFalse(result.isValid());
+        assertTrue(result.getErrors().get(0).contains("is not listed in 'teams'"));
+    }
+
+    @Test
+    @DisplayName("validateProjectsWithDetails debe rechazar solo los proyectos sin credenciales")
+    void testValidateProjectsWithDetails_TeamNotListedIsInvalid() {
+        // Arrange
+        when(ldService.getAllProjects()).thenReturn(new ArrayList<>());
+
+        ProjectDTO listed = createValidProject();
+        ProjectDTO notListed = createValidProject();
+        notListed.setName("Not Listed");
+        notListed.setExternalId("not-listed-team");
+
+        // Act
+        Map<String, Object> result = projectValidationService
+                .validateProjectsWithDetails(Arrays.asList(listed, notListed));
+
+        // Assert
+        assertEquals(1, result.get("validCount"));
+        assertEquals(1, result.get("invalidCount"));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> invalidProjects = (List<Map<String, Object>>) result.get("invalidProjects");
+        assertSame(notListed, invalidProjects.get(0).get("project"));
+        assertTrue(invalidProjects.get(0).get("errors").toString().contains("not-listed-team"));
     }
 
     @Test

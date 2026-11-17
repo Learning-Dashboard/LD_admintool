@@ -39,7 +39,6 @@ class GitHubValidationServiceTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(githubValidationService, "githubApiUrl", GITHUB_API_URL);
-        ReflectionTestUtils.setField(githubValidationService, "githubToken", GITHUB_TOKEN);
         ReflectionTestUtils.setField(githubValidationService, "restTemplate", restTemplate);
     }
 
@@ -55,7 +54,7 @@ class GitHubValidationServiceTest {
                 .thenReturn(responseEntity);
 
         // Act
-        ValidationResult result = githubValidationService.validateOrganization(org, null);
+        ValidationResult result = githubValidationService.validateOrganization(org, GITHUB_TOKEN);
 
         // Assert
         assertTrue(result.isValid());
@@ -72,7 +71,7 @@ class GitHubValidationServiceTest {
                 .thenThrow(HttpClientErrorException.NotFound.create(HttpStatus.NOT_FOUND, "Not Found", null, null, null));
 
         // Act
-        ValidationResult result = githubValidationService.validateOrganization(org, null);
+        ValidationResult result = githubValidationService.validateOrganization(org, GITHUB_TOKEN);
 
         // Assert
         assertFalse(result.isValid());
@@ -83,7 +82,7 @@ class GitHubValidationServiceTest {
     @DisplayName("validateOrganization debe retornar error si nombre está vacío")
     void testValidateOrganization_EmptyName() {
         // Act
-        ValidationResult result = githubValidationService.validateOrganization("", null);
+        ValidationResult result = githubValidationService.validateOrganization("", GITHUB_TOKEN);
 
         // Assert
         assertFalse(result.isValid());
@@ -95,7 +94,7 @@ class GitHubValidationServiceTest {
     @DisplayName("validateOrganization debe retornar error si nombre es null")
     void testValidateOrganization_NullName() {
         // Act
-        ValidationResult result = githubValidationService.validateOrganization(null, null);
+        ValidationResult result = githubValidationService.validateOrganization(null, GITHUB_TOKEN);
 
         // Assert
         assertFalse(result.isValid());
@@ -114,7 +113,7 @@ class GitHubValidationServiceTest {
                 .thenReturn(responseEntity);
 
         // Act
-        ValidationResult result = githubValidationService.validateOrganization(org, null);
+        ValidationResult result = githubValidationService.validateOrganization(org, GITHUB_TOKEN);
 
         // Assert
         assertTrue(result.isValid());
@@ -124,7 +123,7 @@ class GitHubValidationServiceTest {
     }
 
     @Test
-    @DisplayName("validateOrganization debe usar token del proyecto si está disponible")
+    @DisplayName("validateOrganization debe usar el token de la asignatura del proyecto")
     void testValidateOrganization_WithProjectToken() {
         // Arrange
         String org = "test-org";
@@ -152,7 +151,7 @@ class GitHubValidationServiceTest {
                 .thenThrow(HttpClientErrorException.Unauthorized.create(HttpStatus.UNAUTHORIZED, "Unauthorized", null, null, null));
 
         // Act
-        ValidationResult result = githubValidationService.validateOrganization(org, null);
+        ValidationResult result = githubValidationService.validateOrganization(org, GITHUB_TOKEN);
 
         // Assert
         assertFalse(result.isValid());
@@ -178,7 +177,7 @@ class GitHubValidationServiceTest {
                 .thenReturn(responseEntity);
 
         // Act
-        ValidationResult result = githubValidationService.validateUsersInOrganization(org, usernames, null);
+        ValidationResult result = githubValidationService.validateUsersInOrganization(org, usernames, GITHUB_TOKEN);
 
         // Assert
         assertTrue(result.isValid());
@@ -199,7 +198,7 @@ class GitHubValidationServiceTest {
                 .thenReturn(responseEntity);
 
         // Act
-        ValidationResult result = githubValidationService.validateUsersInOrganization(org, usernames, null);
+        ValidationResult result = githubValidationService.validateUsersInOrganization(org, usernames, GITHUB_TOKEN);
 
         // Assert
         assertFalse(result.isValid());
@@ -210,7 +209,7 @@ class GitHubValidationServiceTest {
     @DisplayName("validateUsersInOrganization debe retornar válido si lista de usuarios está vacía")
     void testValidateUsersInOrganization_EmptyList() {
         // Act
-        ValidationResult result = githubValidationService.validateUsersInOrganization("test-org", Arrays.asList(), null);
+        ValidationResult result = githubValidationService.validateUsersInOrganization("test-org", Arrays.asList(), GITHUB_TOKEN);
 
         // Assert
         assertTrue(result.isValid());
@@ -221,7 +220,7 @@ class GitHubValidationServiceTest {
     @DisplayName("validateUsersInOrganization debe retornar válido si lista es null")
     void testValidateUsersInOrganization_NullList() {
         // Act
-        ValidationResult result = githubValidationService.validateUsersInOrganization("test-org", null, null);
+        ValidationResult result = githubValidationService.validateUsersInOrganization("test-org", null, GITHUB_TOKEN);
 
         // Assert
         assertTrue(result.isValid());
@@ -242,7 +241,7 @@ class GitHubValidationServiceTest {
                 .thenReturn(responseEntity);
 
         // Act
-        ValidationResult result = githubValidationService.validateUsersInOrganization(org, usernames, null);
+        ValidationResult result = githubValidationService.validateUsersInOrganization(org, usernames, GITHUB_TOKEN);
 
         // Assert
         assertFalse(result.isValid());
@@ -260,7 +259,7 @@ class GitHubValidationServiceTest {
                 .thenThrow(new HttpClientErrorException(HttpStatus.NOT_FOUND));
 
         // Act
-        ValidationResult result = githubValidationService.validateUsersInOrganization(org, usernames, null);
+        ValidationResult result = githubValidationService.validateUsersInOrganization(org, usernames, GITHUB_TOKEN);
 
         // Assert
         assertFalse(result.isValid());
@@ -278,7 +277,7 @@ class GitHubValidationServiceTest {
                 .thenThrow(new RuntimeException("Connection timeout"));
 
         // Act
-        ValidationResult result = githubValidationService.validateOrganization(org, null);
+        ValidationResult result = githubValidationService.validateOrganization(org, GITHUB_TOKEN);
 
         // Assert
         assertFalse(result.isValid());
@@ -299,7 +298,7 @@ class GitHubValidationServiceTest {
                 .thenReturn(responseEntity);
 
         // Act
-        ValidationResult result = githubValidationService.validateUser(username, null);
+        ValidationResult result = githubValidationService.validateUser(username, GITHUB_TOKEN);
 
         // Assert
         assertTrue(result.isValid());
@@ -313,7 +312,7 @@ class GitHubValidationServiceTest {
     }
 
     @Test
-    @DisplayName("validateUser debe usar token del proyecto si se proporciona")
+    @DisplayName("validateUser debe usar el token de la asignatura del proyecto")
     void testValidateUser_WithProjectToken() {
         // Arrange
         String username = "testuser";
@@ -350,7 +349,7 @@ class GitHubValidationServiceTest {
                 .thenThrow(HttpClientErrorException.NotFound.create(HttpStatus.NOT_FOUND, "Not Found", null, null, null));
 
         // Act
-        ValidationResult result = githubValidationService.validateUser(username, null);
+        ValidationResult result = githubValidationService.validateUser(username, GITHUB_TOKEN);
 
         // Assert
         assertFalse(result.isValid());
@@ -371,7 +370,7 @@ class GitHubValidationServiceTest {
                 .thenReturn(responseEntity);
 
         // Act
-        ValidationResult result = githubValidationService.validateUser(username, null);
+        ValidationResult result = githubValidationService.validateUser(username, GITHUB_TOKEN);
 
         // Assert
         assertFalse(result.isValid());
@@ -390,7 +389,7 @@ class GitHubValidationServiceTest {
                 .thenThrow(new RuntimeException("Network error"));
 
         // Act
-        ValidationResult result = githubValidationService.validateUser(username, null);
+        ValidationResult result = githubValidationService.validateUser(username, GITHUB_TOKEN);
 
         // Assert
         assertFalse(result.isValid());
@@ -403,5 +402,47 @@ class GitHubValidationServiceTest {
         return new java.util.HashMap<String, Object>() {{
             put("login", login);
         }};
+    }
+
+    @Test
+    @DisplayName("validateUsersInOrganization debe usar el token de la asignatura del proyecto")
+    void testValidateUsersInOrganization_UsesSubjectToken() {
+        // Arrange
+        java.util.Map<String, Object> member = new java.util.HashMap<>();
+        member.put("login", "user1");
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(Object[].class)))
+                .thenReturn(new ResponseEntity<>(new Object[]{member}, HttpStatus.OK));
+
+        // Act
+        ValidationResult result = githubValidationService.validateUsersInOrganization(
+                "test-org", Arrays.asList("user1"), "  subject-token ");
+
+        // Assert
+        assertTrue(result.isValid());
+        verify(restTemplate).exchange(
+                eq(GITHUB_API_URL + "/orgs/test-org/members"),
+                eq(HttpMethod.GET),
+                argThat(entity -> "token subject-token"
+                        .equals(((HttpEntity<?>) entity).getHeaders().getFirst("Authorization"))),
+                eq(Object[].class)
+        );
+    }
+
+    @Test
+    @DisplayName("sin token de la asignatura no se hace ninguna petición a GitHub")
+    void testNoRequestWithoutSubjectToken() {
+        // Act
+        ValidationResult orgResult = githubValidationService.validateOrganization("test-org", null);
+        ValidationResult usersResult = githubValidationService.validateUsersInOrganization(
+                "test-org", Arrays.asList("user1"), "  ");
+        ValidationResult userResult = githubValidationService.validateUser("user1", "");
+
+        // Assert: no hay token global al que recurrir
+        for (ValidationResult result : Arrays.asList(orgResult, usersResult, userResult)) {
+            assertFalse(result.isValid());
+            assertTrue(result.getErrors().get(0).contains("The GitHub token of the subject is empty"),
+                    "Unexpected errors: " + result.getErrors());
+        }
+        verifyNoInteractions(restTemplate);
     }
 }

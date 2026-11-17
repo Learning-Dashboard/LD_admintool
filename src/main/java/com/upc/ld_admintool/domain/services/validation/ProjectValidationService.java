@@ -2,6 +2,9 @@ package com.upc.ld_admintool.domain.services.validation;
 
 import com.upc.ld_admintool.domain.utils.DataSource;
 import com.upc.ld_admintool.domain.services.LDService;
+import com.upc.ld_admintool.domain.services.credentials.CredentialsConfigException;
+import com.upc.ld_admintool.domain.services.credentials.SubjectCredentials;
+import com.upc.ld_admintool.domain.services.credentials.SubjectCredentialsService;
 import com.upc.ld_admintool.rest.DTO.ProjectDTO;
 import com.upc.ld_admintool.rest.DTO.ProjectIdentityDTO;
 import com.upc.ld_admintool.rest.DTO.StudentDTO;
@@ -30,9 +33,15 @@ public class ProjectValidationService {
     @Autowired
     private LDService ldService;
 
+    @Autowired
+    private SubjectCredentialsService subjectCredentialsService;
+
     /**
      * Valida un projecte complet amb els seus estudiants.
-     * Utilitza el token de GitHub específic del projecte si està disponible.
+     * Utilitza el token de GitHub i el servidor Taiga de l'assignatura del
+     * projecte (credentials config). El projecte ha d'estar llistat a 'teams' de
+     * la seva assignatura: és el que LD Connect fa servir per trobar les
+     * credencials dels seus esdeveniments.
      */
     public ValidationResult validateProject(ProjectDTO project) {
         ValidationResult result = new ValidationResult(true);
@@ -43,8 +52,24 @@ public class ProjectValidationService {
             return result;
         }
 
-        // Obtenir el token de GitHub del projecte (pot ser null)
-        String projectGithubToken = project.getGithubToken();
+        // Credencials de l'assignatura del projecte
+        SubjectCredentials credentials;
+        try {
+            credentials = subjectCredentialsService.resolveBySubject(project.getSubject());
+        } catch (CredentialsConfigException e) {
+            result.addError("The credentials of project '" + project.getName() + "' cannot be resolved: "
+                    + e.getMessage());
+            return result;
+        }
+
+        if (!credentials.hasTeam(project.getExternalId())) {
+            result.addError("The project '" + project.getName() + "' (team '" + project.getExternalId()
+                    + "') is not listed in 'teams' of subject '" + credentials.subject()
+                    + "' in the credentials config. Add it there before importing the project.");
+            return result;
+        }
+
+        String projectGithubToken = credentials.githubToken();
 
         // Validar GitHub (com ho feia la Nora)
         ProjectIdentityDTO githubIdentity = project.getIdentities().get(DataSource.GITHUB);
@@ -88,7 +113,8 @@ public class ProjectValidationService {
         if (taigaIdentity != null && taigaIdentity.getUrl() != null) {
             String slug = extractTaigaSlug(taigaIdentity.getUrl());
             if (slug != null) {
-                ValidationResult taigaResult = taigaValidationService.validateProjectBySlug(slug);
+                ValidationResult taigaResult = taigaValidationService.validateProjectBySlug(slug,
+                        credentials.taiga());
                 result.getErrors().addAll(taigaResult.getErrors());
                 result.getWarnings().addAll(taigaResult.getWarnings());
 
@@ -106,7 +132,7 @@ public class ProjectValidationService {
 
                     if (!taigaUsernames.isEmpty()) {
                         ValidationResult usersResult = taigaValidationService.validateUsersInProject(slug,
-                                taigaUsernames);
+                                taigaUsernames, credentials.taiga());
                         result.addErrors(usersResult.getErrors());
                         result.addWarnings(usersResult.getWarnings());
                     }
@@ -210,14 +236,30 @@ public class ProjectValidationService {
     }
 
     /**
-     * Valida un estudiant individualment.
+     * Valida un estudiant individualment, amb les credencials de l'assignatura
+     * del seu projecte.
      */
-    public ValidationResult validateStudent(String githubUrl, String taigaUrl, String githubToken, StudentDTO student) {
+    public ValidationResult validateStudent(Long projectId, String githubUrl, String taigaUrl, StudentDTO student) {
         ValidationResult result = new ValidationResult(true);
 
         if (student == null || student.getIdentities() == null) {
             result.addError("The student has no defined identities");
             result.setValid(false);
+            return result;
+        }
+
+        ProjectDTO project = projectId == null ? null : ldService.getProjectById(projectId);
+        if (project == null) {
+            result.addError("The project of the student was not found");
+            return result;
+        }
+
+        SubjectCredentials credentials;
+        try {
+            credentials = subjectCredentialsService.resolveBySubject(project.getSubject());
+        } catch (CredentialsConfigException e) {
+            result.addError("The credentials of project '" + project.getName() + "' cannot be resolved: "
+                    + e.getMessage());
             return result;
         }
 
@@ -229,7 +271,7 @@ public class ProjectValidationService {
                 if (studentGithub != null && studentGithub.getUsername() != null) {
                     List<String> usernames = List.of(studentGithub.getUsername());
                     ValidationResult usersResult = githubValidationService.validateUsersInOrganization(
-                            org, usernames, githubToken);
+                            org, usernames, credentials.githubToken());
                     result.addErrors(usersResult.getErrors());
                     result.addWarnings(usersResult.getWarnings());
                 }
@@ -243,7 +285,8 @@ public class ProjectValidationService {
                 StudentIdentityDTO studentTaiga = student.getIdentities().get(DataSource.TAIGA);
                 if (studentTaiga != null && studentTaiga.getUsername() != null) {
                     List<String> usernames = List.of(studentTaiga.getUsername());
-                    ValidationResult usersResult = taigaValidationService.validateUsersInProject(slug, usernames);
+                    ValidationResult usersResult = taigaValidationService.validateUsersInProject(slug, usernames,
+                            credentials.taiga());
                     result.addErrors(usersResult.getErrors());
                     result.addWarnings(usersResult.getWarnings());
                 }

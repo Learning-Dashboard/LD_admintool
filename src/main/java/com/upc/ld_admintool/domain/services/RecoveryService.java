@@ -39,7 +39,12 @@ public class RecoveryService {
         return response.getBody() != null ? response.getBody() : Map.of("status", "error");
     }
 
-    public Map<String, Object> runTeamRecovery(Long projectId, Map<String, String> tokenOverrides) {
+    /*
+     * The recovery requests carry no credentials: LD Connect resolves the GitHub
+     * token and the Taiga server from the team (prj) in its credentials config.
+     */
+
+    public Map<String, Object> runTeamRecovery(Long projectId) {
         ProjectDTO project = ldService.getProjectById(projectId);
         if (project == null) throw new IllegalArgumentException("Project not found");
 
@@ -57,7 +62,6 @@ public class RecoveryService {
         payload.put("prj", prj);
         payload.put("github_url", githubUrl);
         payload.put("taiga_url", taigaUrl);
-        applyTokenOverrides(payload, tokenOverrides, true, true);
 
         String jobId = startJob(ldConnectUrl + "/admin/recovery/team", payload);
 
@@ -69,7 +73,7 @@ public class RecoveryService {
         return result;
     }
 
-    public Map<String, Object> runGithubRecovery(Long projectId, Map<String, String> tokenOverrides) {
+    public Map<String, Object> runGithubRecovery(Long projectId) {
         ProjectDTO project = ldService.getProjectById(projectId);
         if (project == null) throw new IllegalArgumentException("Project not found");
 
@@ -83,7 +87,6 @@ public class RecoveryService {
         Map<String, Object> payload = new HashMap<>();
         payload.put("prj", prj);
         payload.put("github_url", githubUrl);
-        applyTokenOverrides(payload, tokenOverrides, true, false);
 
         String jobId = startJob(ldConnectUrl + "/admin/recovery/github", payload);
 
@@ -95,7 +98,7 @@ public class RecoveryService {
         return result;
     }
 
-    public Map<String, Object> runTaigaRecovery(Long projectId, Map<String, String> tokenOverrides) {
+    public Map<String, Object> runTaigaRecovery(Long projectId) {
         ProjectDTO project = ldService.getProjectById(projectId);
         if (project == null) throw new IllegalArgumentException("Project not found");
 
@@ -109,7 +112,6 @@ public class RecoveryService {
         Map<String, Object> payload = new HashMap<>();
         payload.put("prj", prj);
         payload.put("taiga_url", taigaUrl);
-        applyTokenOverrides(payload, tokenOverrides, false, true);
 
         String jobId = startJob(ldConnectUrl + "/admin/recovery/taiga", payload);
 
@@ -128,19 +130,6 @@ public class RecoveryService {
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
         ResponseEntity<Map> response = restTemplate.postForEntity(url, request, Map.class);
         return (String) response.getBody().get("job_id");
-    }
-
-    private void applyTokenOverrides(Map<String, Object> payload, Map<String, String> overrides,
-                                      boolean github, boolean taiga) {
-        if (overrides == null) return;
-        if (github) {
-            String t = overrides.get("githubToken");
-            if (t != null && !t.isBlank()) payload.put("github_token", t);
-        }
-        if (taiga) {
-            String t = overrides.get("taigaToken");
-            if (t != null && !t.isBlank()) payload.put("taiga_token", t);
-        }
     }
 
     private String extractIdentityUrl(Map<DataSource, ProjectIdentityDTO> identities, DataSource source) {

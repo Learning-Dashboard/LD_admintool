@@ -26,13 +26,13 @@ class DTOTest {
         project.setName("Test Project");
         project.setDescription("Test Description");
         project.setExternalId("ext-123");
-        project.setGithubToken("github-token");
+        project.setSubject("AMEP");
 
         assertEquals(1L, project.getId());
         assertEquals("Test Project", project.getName());
         assertEquals("Test Description", project.getDescription());
         assertEquals("ext-123", project.getExternalId());
-        assertEquals("github-token", project.getGithubToken());
+        assertEquals("AMEP", project.getSubject());
     }
 
     @Test
@@ -182,12 +182,12 @@ class DTOTest {
     @DisplayName("ProjectDTO debe permitir null en campos opcionales")
     void testProjectDTO_NullableFields() {
         ProjectDTO project = new ProjectDTO();
-        project.setGithubToken(null);
+        project.setSubject(null);
         project.setDescription(null);
         project.setStudents(null);
         project.setIdentities(null);
         
-        assertNull(project.getGithubToken());
+        assertNull(project.getSubject());
         assertNull(project.getDescription());
         assertNull(project.getStudents());
         assertNull(project.getIdentities());

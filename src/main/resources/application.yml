@@ -17,10 +17,16 @@ spring:
     password: ${DB_PASSWORD:example}
     driver-class-name: org.postgresql.Driver
 
-taiga:
-  api:
-    url: ${TAIGA_API_URL:https://api.taiga.io/api/v1}
-  token: ${TAIGA_TOKEN:}
+# Per-subject credentials (GitHub token, Taiga server, teams). It is the same
+# file that LD Connect uses: LD_Connect_Event/config_files/credentials_config.json
+credentials:
+  file: ${CREDENTIALS_FILE:config_files/credentials_config.json}
 
-github:
-  token: ${GITHUB_TOKEN:}
+# Fallback Taiga, used by the subjects that leave taiga_api_url and
+# taiga_auth_url empty in the credentials file.
+taiga:
+  fallback:
+    api-url: ${TAIGA_FALLBACK_API_URL:}
+    auth-url: ${TAIGA_FALLBACK_AUTH_URL:}
+    username: ${TAIGA_FALLBACK_USERNAME:}
+    password: ${TAIGA_FALLBACK_PASSWORD:}

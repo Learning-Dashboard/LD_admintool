@@ -70,19 +70,18 @@ public class ProjectController {
     @PostMapping("/validate-student")
     public ResponseEntity<ValidationResult> validateStudent(@RequestBody StudentValidationDTO request) {
         ValidationResult result = validationService.validateStudent(
+                request.getProjectId(),
                 request.getGithubUrl(),
                 request.getTaigaUrl(),
-                request.getGithubToken(),
                 request.getStudent());
 
         return ResponseEntity.ok(result);
     }
 
     @PostMapping("/{id}/recover")
-    public ResponseEntity<?> triggerRecovery(@PathVariable Long id,
-            @RequestBody(required = false) Map<String, String> tokenOverrides) {
+    public ResponseEntity<?> triggerRecovery(@PathVariable Long id) {
         try {
-            return ResponseEntity.accepted().body(recoveryService.runTeamRecovery(id, tokenOverrides));
+            return ResponseEntity.accepted().body(recoveryService.runTeamRecovery(id));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -91,10 +90,9 @@ public class ProjectController {
     }
 
     @PostMapping("/{id}/recover/github")
-    public ResponseEntity<?> triggerGithubRecovery(@PathVariable Long id,
-            @RequestBody(required = false) Map<String, String> tokenOverrides) {
+    public ResponseEntity<?> triggerGithubRecovery(@PathVariable Long id) {
         try {
-            return ResponseEntity.accepted().body(recoveryService.runGithubRecovery(id, tokenOverrides));
+            return ResponseEntity.accepted().body(recoveryService.runGithubRecovery(id));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -103,10 +101,9 @@ public class ProjectController {
     }
 
     @PostMapping("/{id}/recover/taiga")
-    public ResponseEntity<?> triggerTaigaRecovery(@PathVariable Long id,
-            @RequestBody(required = false) Map<String, String> tokenOverrides) {
+    public ResponseEntity<?> triggerTaigaRecovery(@PathVariable Long id) {
         try {
-            return ResponseEntity.accepted().body(recoveryService.runTaigaRecovery(id, tokenOverrides));
+            return ResponseEntity.accepted().body(recoveryService.runTaigaRecovery(id));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
